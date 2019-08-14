@@ -32,12 +32,14 @@ class SimpleEnergyModel(BaseEnergyModel):
             self.internal_layers.append(layer)
         output_layer = nn.Linear(num_units, 1)
         self.internal_layers.append(output_layer)
+        # ToDo: Add weight initialization
 
     def forward(self, x):
         for layer in self.internal_layers[:-1]:
             x = layer(x)
             x = F.leaky_relu(x)
         x = self.internal_layers[-1](x)
+        # ToDo: Make strength of quadratic term tunable
         return x + torch.sum(x**2, axis=1, keepdim=True)
 
 
@@ -62,6 +64,7 @@ class ConvEnergyModel(BaseEnergyModel):
         self.dense_size=w*h*num_units
         dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)
+        # ToDo: Add weight initialization
 
     def forward(self, x):
         x = torch.reshape(x, (-1, )+self.input_shape)
@@ -70,4 +73,5 @@ class ConvEnergyModel(BaseEnergyModel):
             x = F.leaky_relu(x)
         x = torch.reshape(x, (-1, self.dense_size))
         x = self.internal_layers[-1](x)
+        # ToDo: Make strength of quadratic term tunable
         return x + torch.sum(x**2, axis=1, keepdim=True)
