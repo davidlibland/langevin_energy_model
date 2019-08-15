@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class BaseEnergyModel(nn.Module):
     def sample_fantasy(self, x: torch.Tensor, num_mc_steps=100, lr=1e-3, sigma=1):
         for _ in range(num_mc_steps):
@@ -11,13 +12,17 @@ class BaseEnergyModel(nn.Module):
         return x
 
     def fantasy_step(self, x: torch.Tensor, lr=1e-3, sigma=1):
-        noise_scale = sigma*torch.sqrt(torch.as_tensor(lr*2))
         x.requires_grad_(True)
         if x.grad is not None:
             x.grad.data.zero_()
         y = self(x).sum()
         y.backward()
         grad_x = x.grad
+
+        # Hack to keep gradients in control:
+        lr = lr/grad_x.max()
+
+        noise_scale = sigma*torch.sqrt(torch.as_tensor(lr*2))
         result = x - lr*grad_x+noise_scale*torch.randn_like(x)
         return result.detach()
 
