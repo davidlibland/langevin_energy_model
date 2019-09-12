@@ -72,11 +72,12 @@ class ConvEnergyModel(BaseEnergyModel):
         # ToDo: Add weight initialization
 
     def forward(self, x):
-        x = torch.reshape(x, (-1, )+self.input_shape)
+        n = x.shape[0]
+        x = torch.reshape(x, (n, )+self.input_shape)
         for layer in self.internal_layers[:-1]:
             x = layer(x)
             x = F.leaky_relu(x)
-        x = torch.reshape(x, (-1, self.dense_size))
+        x = torch.reshape(x, (n, self.dense_size))
         x = self.internal_layers[-1](x)
         # ToDo: Make strength of quadratic term tunable
         return x + torch.sum(x**2, dim=1, keepdim=True)

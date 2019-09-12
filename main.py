@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from distributions.core import Distribution, Normal
 from distributions.mnist import get_approx_mnist_distribution
+from distributions.digits import get_approx_digit_distribution
 from model import SimpleEnergyModel, ConvEnergyModel
 
 
@@ -42,7 +43,7 @@ def train(net: SimpleEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
             if verbose:
                 print(f"on epoch {step}, batch {i_batch}, loss: {loss}")
         print(f"on epoch {step}, loss: {sum(losses)/len(losses)}")
-    return model_sample.cpu()
+    return model_sample
 
 
 def setup_1d():
@@ -65,9 +66,15 @@ def setup_2d():
     return dist, net
 
 
+def setup_digits():
+    dist = get_approx_digit_distribution()
+    net = ConvEnergyModel((1, 8, 8), 3, 25)
+    return dist, net
+
+
 def setup_mnist():
     dist = get_approx_mnist_distribution()
-    net = ConvEnergyModel((1, 8, 8), 3, 25)
+    net = ConvEnergyModel((1, 28, 28), 3, 25)
     return dist, net
 
 
@@ -81,7 +88,7 @@ def main():
     model_sample = None
     while train_more == "y":
         model_sample = train(net, dataset, num_steps=1, model_sample=model_sample)
-        dist.visualize(plt.gcf(), model_sample, energy)
+        dist.visualize(plt.gcf(), model_sample.cpu(), energy)
         plt.show()
         train_more = input("Train more?")
 
