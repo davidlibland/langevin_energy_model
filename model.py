@@ -45,7 +45,7 @@ class SimpleEnergyModel(BaseEnergyModel):
             x = F.leaky_relu(x)
         x = self.internal_layers[-1](x)
         # ToDo: Make strength of quadratic term tunable
-        return x + torch.sum(x**2, axis=1, keepdim=True)
+        return x + torch.sum(x**2, dim=1, keepdim=True)
 
 
 class ConvEnergyModel(BaseEnergyModel):
@@ -79,4 +79,4 @@ class ConvEnergyModel(BaseEnergyModel):
         x = torch.reshape(x, (-1, self.dense_size))
         x = self.internal_layers[-1](x)
         # ToDo: Make strength of quadratic term tunable
-        return x + torch.sum(x**2, axis=1, keepdim=True)
+        return x + torch.sum(x**2, dim=1, keepdim=True)

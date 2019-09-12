@@ -19,11 +19,14 @@ def train(net: SimpleEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
         drop_last=True,
         shuffle=True
     )
-    print(f"training on {len(dataset)} samples.")
+    # Determine the device type:
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    net.to(device)
+    print(f"training on {len(dataset)} samples using {device}.")
     for step in range(num_steps):
         losses = []
         for i_batch, sample_batched in enumerate(dataloader):
-            data_sample = sample_batched[0]
+            data_sample = sample_batched[0].to(device)
             if model_sample is None:
                 model_sample = data_sample
 
@@ -39,7 +42,7 @@ def train(net: SimpleEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
             if verbose:
                 print(f"on epoch {step}, batch {i_batch}, loss: {loss}")
         print(f"on epoch {step}, loss: {sum(losses)/len(losses)}")
-    return model_sample
+    return model_sample.cpu()
 
 
 def setup_1d():
