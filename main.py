@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 from distributions.core import Distribution, Normal
 from distributions.mnist import get_approx_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
-from model import SimpleEnergyModel, ConvEnergyModel
+from model import BaseEnergyModel, SimpleEnergyModel, ConvEnergyModel, ResnetEnergyModel
 
 
-def train(net: SimpleEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
+def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
           batch_size=100, model_sample=None,
           verbose=True):
     optimizer = optim.SGD(net.parameters(), lr=lr, weight_decay=1e-3)
@@ -68,7 +68,7 @@ def setup_2d():
 
 def setup_digits():
     dist = get_approx_digit_distribution()
-    net = ConvEnergyModel((1, 8, 8), 3, 25)
+    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25)
     return dist, net
 
 
@@ -79,7 +79,7 @@ def setup_mnist():
 
 
 def main():
-    dist, net = setup_mnist()
+    dist, net = setup_digits()
     samples = dist.rvs(100)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))

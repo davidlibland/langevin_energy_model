@@ -3,6 +3,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils.resnet import BasicBlock as BasicResnetBlock
 
 
 class BaseEnergyModel(nn.Module):
@@ -74,6 +75,49 @@ class ConvEnergyModel(BaseEnergyModel):
     def forward(self, x):
         n = x.shape[0]
         x = torch.reshape(x, (n, )+self.input_shape)
+        for layer in self.internal_layers[:-1]:
+            x = layer(x)
+            x = F.leaky_relu(x)
+        x = torch.reshape(x, (n, self.dense_size))
+        x = self.internal_layers[-1](x)
+        # ToDo: Make strength of quadratic term tunable
+        return x + torch.sum(x**2, dim=1, keepdim=True)
+
+
+class ResnetEnergyModel(BaseEnergyModel):
+    def __init__(self, input_shape, num_layers=3, num_resnets=2, num_units=25):
+        super().__init__()
+        self.input_shape = input_shape
+        self.internal_layers = nn.ModuleList()
+        c, h, w = input_shape
+        in_channels = c + 1
+        kernel_size = (3, 3)
+        for _ in range(num_layers-1):
+            for _ in range(num_resnets):
+                res_net_layer = BasicResnetBlock(
+                    in_channels=in_channels,
+                    out_channels=num_units
+                )
+                self.internal_layers.append(res_net_layer)
+                in_channels = num_units
+            layer = nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=num_units,
+                kernel_size=kernel_size
+            )
+            w -= kernel_size[1] - 1
+            h -= kernel_size[0] - 1
+            self.internal_layers.append(layer)
+        self.dense_size=w*h*num_units
+        dense_layer = nn.Linear(self.dense_size, 1)
+        self.internal_layers.append(dense_layer)
+        # ToDo: Add weight initialization
+
+    def forward(self, x):
+        n = x.shape[0]
+        x = torch.reshape(x, (n, )+self.input_shape)
+        ones = torch.ones_like(x)
+        x = torch.cat([ones, x], dim=1) # add a channel of 1s to distinguish padding.
         for layer in self.internal_layers[:-1]:
             x = layer(x)
             x = F.leaky_relu(x)
