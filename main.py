@@ -31,9 +31,11 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
             if model_sample is None:
                 model_sample = data_sample
 
+            net.eval()
             model_sample = net.sample_fantasy(model_sample, lr=1e-1).detach()
 
             # Forward gradient:
+            net.train()
             net.zero_grad()
             loss = (net(data_sample) - net(model_sample)).mean()
             loss.backward()
@@ -84,6 +86,8 @@ def main():
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
     energy = lambda x: net(torch.tensor(x, dtype=torch.float)).detach().numpy()
+    dist.visualize(plt.gcf(), samples, energy)
+    plt.show()
     train_more = "y"
     model_sample = None
     while train_more == "y":

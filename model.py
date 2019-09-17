@@ -100,18 +100,22 @@ class ResnetEnergyModel(BaseEnergyModel):
                 )
                 self.internal_layers.append(res_net_layer)
                 in_channels = num_units
-            layer = nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=num_units,
-                kernel_size=kernel_size
-            )
+
+            maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=0)
             w -= kernel_size[1] - 1
             h -= kernel_size[0] - 1
-            self.internal_layers.append(layer)
+            self.internal_layers.append(maxpool)
         self.dense_size=w*h*num_units
         dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         n = x.shape[0]
