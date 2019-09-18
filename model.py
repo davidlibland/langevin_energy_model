@@ -8,6 +8,8 @@ from utils.resnet import Swish
 
 
 class BaseEnergyModel(nn.Module):
+    grad_max = 100
+
     def sample_fantasy(self, x: torch.Tensor, num_mc_steps=100, lr=1e-3, sigma=1):
         for _ in range(num_mc_steps):
             x = self.fantasy_step(x, lr=lr, sigma=sigma)
@@ -22,7 +24,7 @@ class BaseEnergyModel(nn.Module):
         grad_x = x.grad
 
         # Hack to keep gradients in control:
-        lr = lr/grad_x.max()
+        lr = lr/max(1, grad_x.abs().max())
 
         noise_scale = sigma*torch.sqrt(torch.as_tensor(lr*2))
         result = x - lr*grad_x+noise_scale*torch.randn_like(x)
@@ -86,8 +88,9 @@ class ConvEnergyModel(BaseEnergyModel):
 
 
 class ResnetEnergyModel(BaseEnergyModel):
-    def __init__(self, input_shape, num_layers=3, num_resnets=2, num_units=25):
+    def __init__(self, input_shape, num_layers=3, num_resnets=2, num_units=25, prior_scale=1):
         super().__init__()
+        self.prior_scale = prior_scale
         self.input_shape = input_shape
         self.internal_layers = nn.ModuleList()
         c, h, w = input_shape
@@ -140,4 +143,4 @@ class ResnetEnergyModel(BaseEnergyModel):
         x = torch.reshape(x, (n, self.dense_size))
         x = self.internal_layers[-1](x)
         # ToDo: Make strength of quadratic term tunable
-        return x + torch.sum(x**2, dim=1, keepdim=True)
+        return x + torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)

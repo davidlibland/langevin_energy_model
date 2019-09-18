@@ -1,3 +1,6 @@
+import random
+from collections import deque
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -9,10 +12,15 @@ from distributions.mnist import get_approx_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
 from model import BaseEnergyModel, SimpleEnergyModel, ConvEnergyModel, ResnetEnergyModel
 
+# Globals
+MAX_REPLAY = 1000
+LANG_INIT_NS = 1
+REPLAY_PROB = .95
+
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
-          batch_size=100, model_sample=None, optimizer=None, num_mc_steps=20,
-          mc_lr=1, verbose=True):
+          batch_size=100, model_samples=None, optimizer=None, num_mc_steps=20,
+          mc_lr=1., verbose=True):
     if optimizer is None:
         optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(
@@ -29,12 +37,24 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
         losses = []
         for i_batch, sample_batched in enumerate(dataloader):
             data_sample = sample_batched[0].to(device)
-            if model_sample is None:
-                model_sample = data_sample
+
+            # Get model samples, either from replay buffer or noise.
+            if model_samples is None:
+                model_samples = deque([LANG_INIT_NS*torch.randn_like(data_sample)])
+            elif len(model_samples) > MAX_REPLAY:
+                model_samples.popleft()
+            replay_sample = random.choice(model_samples)
+            noise_sample = LANG_INIT_NS*torch.randn_like(replay_sample)
+            mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
+            while len(mask.shape) < len(replay_sample.shape):
+                # Add extra feature-dims
+                mask.unsqueeze_(dim=-1)
+            model_sample = torch.where(mask, replay_sample, noise_sample)
 
             net.eval()
             for mc_step in range(num_mc_steps):
                 model_sample = net.sample_fantasy(model_sample, lr=mc_lr).detach()
+            model_samples.append(model_sample)
 
             # Forward gradient:
             net.train()
@@ -47,7 +67,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
             if verbose:
                 print(f"on epoch {step}, batch {i_batch}, loss: {loss}")
         print(f"on epoch {step}, loss: {sum(losses)/len(losses)}")
-    return model_sample
+    return model_samples
 
 
 def setup_1d():
@@ -72,19 +92,19 @@ def setup_2d():
 
 def setup_digits():
     dist = get_approx_digit_distribution()
-    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25)
+    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=LANG_INIT_NS)
     return dist, net
 
 
 def setup_mnist():
     dist = get_approx_mnist_distribution()
-    net = ResnetEnergyModel((1, 28, 28), 3, 2, 25)
+    net = ResnetEnergyModel((1, 28, 28), 3, 2, 25, prior_scale=LANG_INIT_NS)
     return dist, net
 
 
 def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100,
          num_mc_steps=10):
-    dist, net = setup_digits()
+    dist, net = setup_mnist()
     samples = dist.rvs(1000)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
@@ -97,15 +117,15 @@ def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100,
         fig.savefig(f"{fname}_data.png")
     plt.close(fig)
 
-    model_sample = None
+    model_samples = None
     optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     i = 1
     while i % num_saves:
-        model_sample = train(net, dataset, num_steps=num_steps,
-                             model_sample=model_sample, optimizer=optimizer,
+        model_samples = train(net, dataset, num_steps=num_steps,
+                             model_samples=model_samples, optimizer=optimizer,
                              num_mc_steps=num_mc_steps)
         fig = plt.figure()
-        dist.visualize(fig, model_sample.cpu(), energy)
+        dist.visualize(fig, model_samples[-1].cpu(), energy)
         if show:
             plt.show()
         if fname:
