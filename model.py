@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.resnet import BasicBlock as BasicResnetBlock
+from utils.resnet import Swish
 
 
 class BaseEnergyModel(nn.Module):
@@ -96,15 +97,26 @@ class ResnetEnergyModel(BaseEnergyModel):
             for _ in range(num_resnets):
                 res_net_layer = BasicResnetBlock(
                     in_channels=in_channels,
-                    out_channels=num_units
+                    out_channels=num_units,
+                    norm_layer=None,
+                    activation=Swish,
+                    spectral_norm=True,
                 )
                 self.internal_layers.append(res_net_layer)
                 in_channels = num_units
 
-            maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=0)
-            w -= kernel_size[1] - 1
-            h -= kernel_size[0] - 1
-            self.internal_layers.append(maxpool)
+            down_sample = BasicResnetBlock(
+                in_channels=in_channels,
+                out_channels=num_units,
+                norm_layer=None,
+                stride=2
+            )
+            # maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=0)
+            # w -= kernel_size[1] - 1
+            # h -= kernel_size[0] - 1
+            w //= 2
+            h //= 2
+            self.internal_layers.append(down_sample)
         self.dense_size=w*h*num_units
         dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)

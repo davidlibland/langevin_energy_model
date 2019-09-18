@@ -11,8 +11,8 @@ from model import BaseEnergyModel, SimpleEnergyModel, ConvEnergyModel, ResnetEne
 
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
-          batch_size=100, model_sample=None, optimizer=None,
-          verbose=True):
+          batch_size=100, model_sample=None, optimizer=None, num_mc_steps=20,
+          mc_lr=1, verbose=True):
     if optimizer is None:
         optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(
@@ -33,7 +33,8 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
                 model_sample = data_sample
 
             net.eval()
-            model_sample = net.sample_fantasy(model_sample, lr=1e-1).detach()
+            for mc_step in range(num_mc_steps):
+                model_sample = net.sample_fantasy(model_sample, lr=mc_lr).detach()
 
             # Forward gradient:
             net.train()
@@ -77,11 +78,12 @@ def setup_digits():
 
 def setup_mnist():
     dist = get_approx_mnist_distribution()
-    net = ConvEnergyModel((1, 28, 28), 3, 25)
+    net = ResnetEnergyModel((1, 28, 28), 3, 2, 25)
     return dist, net
 
 
-def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100):
+def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100,
+         num_mc_steps=10):
     dist, net = setup_digits()
     samples = dist.rvs(1000)
     print(samples.shape)
@@ -100,7 +102,8 @@ def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100):
     i = 1
     while i % num_saves:
         model_sample = train(net, dataset, num_steps=num_steps,
-                             model_sample=model_sample, optimizer=optimizer)
+                             model_sample=model_sample, optimizer=optimizer,
+                             num_mc_steps=num_mc_steps)
         fig = plt.figure()
         dist.visualize(fig, model_sample.cpu(), energy)
         if show:
@@ -116,4 +119,4 @@ def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100):
 
 
 if __name__ == '__main__':
-    main(lr=1e-2, num_steps=1000, num_saves=100, show=False)
+    main(lr=1e-3, num_steps=1, num_saves=100, show=False, num_mc_steps=5)
