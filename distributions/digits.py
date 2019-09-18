@@ -79,7 +79,7 @@ def plot_digit_samples(fig: plt.Figure, X: np.ndarray, binarize=False):
     fig.clear()
     if binarize:
         X = X > .5
-    n = max(int(sqrt(X.shape[0])), 7)
+    n = min(int(sqrt(X.shape[0])), 7)
 
     ax = fig.subplots(ncols=n, nrows=n)
     for i in range(n):

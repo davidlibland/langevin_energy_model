@@ -11,9 +11,10 @@ from model import BaseEnergyModel, SimpleEnergyModel, ConvEnergyModel, ResnetEne
 
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
-          batch_size=100, model_sample=None,
+          batch_size=100, model_sample=None, optimizer=None,
           verbose=True):
-    optimizer = optim.SGD(net.parameters(), lr=lr, weight_decay=1e-3)
+    if optimizer is None:
+        optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(
         dataset=dataset,
         batch_size=batch_size,
@@ -80,22 +81,39 @@ def setup_mnist():
     return dist, net
 
 
-def main():
+def main(lr=1e-2, num_steps=10, fname="samples", show=True, num_saves=100):
     dist, net = setup_digits()
-    samples = dist.rvs(100)
+    samples = dist.rvs(1000)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
     energy = lambda x: net(torch.tensor(x, dtype=torch.float)).detach().numpy()
-    dist.visualize(plt.gcf(), samples, energy)
-    plt.show()
-    train_more = "y"
-    model_sample = None
-    while train_more == "y":
-        model_sample = train(net, dataset, num_steps=1, model_sample=model_sample)
-        dist.visualize(plt.gcf(), model_sample.cpu(), energy)
+    fig = plt.figure()
+    dist.visualize(fig, samples, energy)
+    if show:
         plt.show()
-        train_more = input("Train more?")
+    if fname:
+        fig.savefig(f"{fname}_data.png")
+    plt.close(fig)
+
+    model_sample = None
+    optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
+    i = 1
+    while i % num_saves:
+        model_sample = train(net, dataset, num_steps=num_steps,
+                             model_sample=model_sample, optimizer=optimizer)
+        fig = plt.figure()
+        dist.visualize(fig, model_sample.cpu(), energy)
+        if show:
+            plt.show()
+        if fname:
+            fig.savefig(f"{fname}_{i}.png")
+        plt.close(fig)
+        i += 1
+        if i % num_saves == 0:
+            if input("Train more?") != "y":
+                break
+            i += 1
 
 
 if __name__ == '__main__':
-    main()
+    main(lr=1e-2, num_steps=1000, num_saves=100, show=False)
