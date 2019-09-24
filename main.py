@@ -49,7 +49,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_steps=10, lr=1e-2,
             while len(mask.shape) < len(replay_sample.shape):
                 # Add extra feature-dims
                 mask.unsqueeze_(dim=-1)
-            model_sample = torch.where(mask, replay_sample, noise_sample)
+            model_sample = torch.where(mask.to(device), replay_sample, noise_sample)
 
             net.eval()
             for mc_step in range(num_mc_steps):
