@@ -45,7 +45,7 @@ def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
 
 
 @curry
-def plot_image_samples(im_size: Tuple[int, ...], fig: plt.Figure, X: np.ndarray, binarize=False):
+def plot_image_samples(im_size: Tuple[int, ...], binarize, fig: plt.Figure, X: np.ndarray, energy=None):
     """Plots model samples on the given figure."""
     fig.clear()
     if binarize:

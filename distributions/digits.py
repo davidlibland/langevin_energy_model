@@ -22,7 +22,7 @@ def get_approx_digit_distribution(n_pca_comp=10, n_mixtures=5,
         Distribution: An approximate model of mnist.
     """
     X, y = load_digits(return_X_y=True)
-    X = X/X.max()
+    X = X.astype(np.float)/X.max()
     y = np.array([int(v) for v in y])
     distributions = []
 
@@ -34,6 +34,6 @@ def get_approx_digit_distribution(n_pca_comp=10, n_mixtures=5,
                                    covariance_type=covariance_type)
         distributions.append(dist)
     mnist_dist = Distribution.mixture(distributions)
-    mnist_dist.visualize = plot_image_samples([8, 8])
+    mnist_dist.visualize = plot_image_samples([8, 8], False)
     mnist_dist.rvs = get_samples(X)
     return mnist_dist
