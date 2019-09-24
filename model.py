@@ -6,9 +6,14 @@ import torch.nn.functional as F
 from utils.resnet import BasicBlock as BasicResnetBlock
 from utils.resnet import Swish
 
+LANG_INIT_NS = 1
+
 
 class BaseEnergyModel(nn.Module):
-    grad_max = 100
+    def __init__(self, prior_scale=LANG_INIT_NS, grad_max=100):
+        super().__init__()
+        self.prior_scale = prior_scale
+        self.grad_max = grad_max
 
     def sample_fantasy(self, x: torch.Tensor, num_mc_steps=100, lr=1e-3, sigma=1):
         for _ in range(num_mc_steps):
@@ -32,8 +37,8 @@ class BaseEnergyModel(nn.Module):
 
 
 class SimpleEnergyModel(BaseEnergyModel):
-    def __init__(self, num_inputs, num_layers, num_units):
-        super().__init__()
+    def __init__(self, num_inputs, num_layers, num_units, prior_scale=LANG_INIT_NS):
+        super().__init__(prior_scale=prior_scale)
         input_layer = nn.Linear(num_inputs, num_units)
         self.internal_layers = nn.ModuleList([input_layer])
         for _ in range(num_layers-2):
@@ -48,13 +53,12 @@ class SimpleEnergyModel(BaseEnergyModel):
             x = layer(x)
             x = F.leaky_relu(x)
         x = self.internal_layers[-1](x)
-        # ToDo: Make strength of quadratic term tunable
-        return x + torch.sum(x**2, dim=1, keepdim=True)
+        return x + torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)
 
 
 class ConvEnergyModel(BaseEnergyModel):
-    def __init__(self, input_shape, num_layers=3, num_units=25):
-        super().__init__()
+    def __init__(self, input_shape, num_layers=3, num_units=25, prior_scale=LANG_INIT_NS):
+        super().__init__(prior_scale=prior_scale)
         self.input_shape = input_shape
         self.internal_layers = nn.ModuleList()
         c, h, w = input_shape
@@ -83,14 +87,12 @@ class ConvEnergyModel(BaseEnergyModel):
             x = F.leaky_relu(x)
         x = torch.reshape(x, (n, self.dense_size))
         x = self.internal_layers[-1](x)
-        # ToDo: Make strength of quadratic term tunable
-        return x + torch.sum(x**2, dim=1, keepdim=True)
+        return x + torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)
 
 
 class ResnetEnergyModel(BaseEnergyModel):
-    def __init__(self, input_shape, num_layers=3, num_resnets=2, num_units=25, prior_scale=1):
-        super().__init__()
-        self.prior_scale = prior_scale
+    def __init__(self, input_shape, num_layers=3, num_resnets=2, num_units=25, prior_scale=LANG_INIT_NS):
+        super().__init__(prior_scale=prior_scale)
         self.input_shape = input_shape
         self.internal_layers = nn.ModuleList()
         c, h, w = input_shape
@@ -142,5 +144,4 @@ class ResnetEnergyModel(BaseEnergyModel):
             x = F.leaky_relu(x)
         x = torch.reshape(x, (n, self.dense_size))
         x = self.internal_layers[-1](x)
-        # ToDo: Make strength of quadratic term tunable
         return x + torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)
