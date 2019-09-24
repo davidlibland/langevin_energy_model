@@ -9,6 +9,8 @@ import torch.utils.data as data
 from model import BaseEnergyModel
 
 # Globals
+from utils.logging import tb_writer
+
 MAX_REPLAY = 1000
 REPLAY_PROB = .95
 
@@ -75,6 +77,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             losses.append(loss)
             if verbose:
                 print(f"on epoch {epoch}, batch {i_batch}, loss: {loss}")
+            tb_writer.add_scalar(tag="loss/objective", scalar_value=loss, global_step=global_step)
             for callback in ckpt_callbacks:
                 callback(net=net, data_sample=data_sample,
                          model_sample=model_sample, epoch=epoch,
