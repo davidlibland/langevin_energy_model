@@ -49,11 +49,12 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             # Get model samples, either from replay buffer or noise.
             if model_samples is None:
                 model_samples = deque(
-                    [net.prior_scale * torch.randn_like(data_sample)])
+                    [net.sample_from_prior(data_sample.shape[0], device=device)])
             elif len(model_samples) > MAX_REPLAY:
                 model_samples.popleft()
             replay_sample = random.choice(model_samples)
-            noise_sample = net.prior_scale * torch.randn_like(replay_sample)
+            noise_sample = net.sample_from_prior(replay_sample.shape[0],
+                                                 device=device)
             mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
             while len(mask.shape) < len(replay_sample.shape):
                 # Add extra feature-dims

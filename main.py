@@ -11,6 +11,7 @@ from distributions.mnist import get_approx_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
 from model import SimpleEnergyModel, ResnetEnergyModel
 from training_loop import train
+from utils.ais import AISLoss
 from utils.logging import RUN_DIR
 from utils.logging import tb_writer
 
@@ -76,10 +77,12 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
             tb_writer.add_figure(tag="data", figure=fig, global_step=global_step)
             plt.close(fig)
 
+    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10)
+
     net, optimizer = train(net, dataset, num_epochs=num_epochs,
                            optimizer=optimizer,
                            num_mc_steps=num_mc_steps,
-                           ckpt_callbacks=[save_images])
+                           ckpt_callbacks=[save_images, ais_loss])
 
 if __name__ == '__main__':
-    main(lr=1e-3, num_epochs=2, show=False, num_mc_steps=5)
+    main(lr=1e-3, num_epochs=1000, show=False, num_mc_steps=5)
