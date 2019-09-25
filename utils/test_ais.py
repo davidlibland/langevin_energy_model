@@ -14,7 +14,7 @@ class DiagonalNormalModel(BaseEnergyModel):
         self.mean = nn.Parameter(torch.randn(1, num_features))
         self.log_scale = nn.Parameter(torch.randn(1, num_features))
 
-    def basic_forward(self, x):
+    def energy(self, x):
         log_z = (0.5*np.log(2*np.pi)+self.log_scale).sum()
         result = (0.5*((x - self.mean)/torch.exp(self.log_scale))**2).sum(dim=1, keepdim=True)+log_z
         return result

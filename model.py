@@ -30,7 +30,7 @@ class BaseEnergyModel(nn.Module):
         x.requires_grad_(True)
         if x.grad is not None:
             x.grad.data.zero_()
-        y = self(x).sum()
+        y = self(x, beta=beta).sum()
         y.backward()
         grad_x = x.grad
 
@@ -38,23 +38,24 @@ class BaseEnergyModel(nn.Module):
         lr = lr/max(1, grad_x.abs().max())
 
         noise_scale = torch.sqrt(torch.as_tensor(lr*2))
-        if beta is None:
-            beta = torch.ones_like(x)
-        result = beta*x - lr*grad_x+noise_scale*torch.randn_like(x)
+        result = x - lr*grad_x+noise_scale*torch.randn_like(x)
         return result.detach()
 
-    def basic_forward(self, x):
+    def energy(self, x):
+        # Override this.
         raise NotImplementedError
 
     def forward(self, *input: Any, **kwargs: Any):
         x = input[0]
-        y = self.basic_forward(x)
+        prior_energy = torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)\
+                       + self._log_z_prior
+        h = self.energy(x)
 
         beta = kwargs.get("beta")
         if beta is None:
-            beta = torch.ones_like(y)
+            beta = torch.ones_like(h)
 
-        return beta*y + torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True) + self._log_z_prior
+        return beta*h + prior_energy
 
 
 class SimpleEnergyModel(BaseEnergyModel):
@@ -69,7 +70,7 @@ class SimpleEnergyModel(BaseEnergyModel):
         self.internal_layers.append(output_layer)
         # ToDo: Add weight initialization
 
-    def basic_forward(self, x, **kwargs):
+    def energy(self, x, **kwargs):
         for layer in self.internal_layers[:-1]:
             x = layer(x)
             x = F.leaky_relu(x)
@@ -101,7 +102,7 @@ class ConvEnergyModel(BaseEnergyModel):
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
 
-    def basic_forward(self, x):
+    def energy(self, x):
         n = x.shape[0]
         x = torch.reshape(x, (n, )+self.input_shape)
         for layer in self.internal_layers[:-1]:
@@ -157,7 +158,7 @@ class ResnetEnergyModel(BaseEnergyModel):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def basic_forward(self, x):
+    def energy(self, x):
         n = x.shape[0]
         x = torch.reshape(x, (n, )+self.input_shape)
         ones = torch.ones_like(x)
