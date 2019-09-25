@@ -38,13 +38,17 @@ def setup_2d():
 
 def setup_digits():
     dist = get_approx_digit_distribution()
-    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25)
+    n = 1000
+    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
     return dist, net
 
 
 def setup_mnist():
     dist = get_approx_mnist_distribution()
-    net = ResnetEnergyModel((1, 28, 28), 3, 2, 25)
+    n = 1000
+    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    net = ResnetEnergyModel((1, 28, 28), 3, 2, 25, prior_scale=scale)
     return dist, net
 
 

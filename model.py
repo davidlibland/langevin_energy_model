@@ -19,14 +19,42 @@ class BaseEnergyModel(nn.Module):
         self._log_z_prior = self.num_features*(0.5*np.log(2*np.pi) + np.log(prior_scale))
 
     def sample_from_prior(self, size: int, device=None):
+        """Returns samples from the prior."""
         return torch.randn(size, self.num_features, device=device)*self.prior_scale
 
-    def sample_fantasy(self, x: torch.Tensor, num_mc_steps=100, lr=1e-3, beta=None):
+    def sample_fantasy(self, x: torch.Tensor=None, num_mc_steps=100, beta=None,
+                       num_samples=None, mc_dynamics="langevin", **kwargs):
+        """
+        Sample fantasy particles.
+
+        Args:
+            x: An initial seed for the sampler. If None, then x will be sampled
+                from the prior.
+            num_mc_steps: The number of MC steps to take.
+            beta: The inverse temperature.
+                Must be a float or broadcastable to x. Defaults to 1.
+            num_samples: If x is not provided, this many samples will be taken
+                from the prior.
+            mc_dynamics: The type of dynamincs to use. Defaults to langevin.
+            **kwargs: Any addition kwargs to be passed to the dynamics
+
+        Returns:
+            Samples.
+        """
+        if x is None:
+            assert isinstance(num_samples, int), \
+                "If x is not provided, then the number of samples must " \
+                "be specified."
+            x = self.sample_from_prior(num_samples)
+        mc_transition = {
+           "langevin":  self.langavin_fantasy_step
+        }.get(mc_dynamics, self.langavin_fantasy_step)
         for _ in range(num_mc_steps):
-            x = self.fantasy_step(x, lr=lr, beta=beta)
+            x = mc_transition(x, beta=beta, **kwargs)
         return x
 
-    def fantasy_step(self, x: torch.Tensor, lr=1e-3, beta=None):
+    def langavin_fantasy_step(self, x: torch.Tensor, beta=None, lr=1e-3, **kwargs):
+        """Perform a single langevin MC update."""
         x.requires_grad_(True)
         if x.grad is not None:
             x.grad.data.zero_()
@@ -42,10 +70,12 @@ class BaseEnergyModel(nn.Module):
         return result.detach()
 
     def energy(self, x):
-        # Override this.
+        """Override this in subclasses"""
         raise NotImplementedError
 
     def forward(self, *input: Any, **kwargs: Any):
+        """A default forward call which incorporates the inverse temperature
+        and prior."""
         x = input[0]
         prior_energy = torch.sum(((x/self.prior_scale)**2)/2, dim=1, keepdim=True)\
                        + self._log_z_prior
