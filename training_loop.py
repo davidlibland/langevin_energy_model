@@ -52,7 +52,11 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
                     [net.sample_from_prior(data_sample.shape[0], device=device)])
             elif len(model_samples) > MAX_REPLAY:
                 model_samples.popleft()
-            replay_sample = random.choice(model_samples)
+            replay_sample = random.choices(
+                model_samples,
+                # favor more recent samples:
+                weights=list(range(1, len(model_samples)+1))
+            )[0]
             noise_sample = net.sample_from_prior(replay_sample.shape[0],
                                                  device=device)
             mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
@@ -63,9 +67,9 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
                                        noise_sample)
 
             net.eval()
-            for mc_step in range(num_mc_steps):
-                model_sample = net.sample_fantasy(model_sample,
-                                                  lr=mc_lr).detach()
+            model_sample = net.sample_fantasy(model_sample,
+                                              num_mc_steps=num_mc_steps,
+                                              lr=mc_lr).detach()
             model_samples.append(model_sample)
 
             # Forward gradient:
