@@ -1,6 +1,7 @@
 import random
 from collections import deque
 from typing import List
+import time
 
 import torch
 import torch.optim as optim
@@ -42,8 +43,11 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
     model_samples = None
     for epoch in range(num_epochs):
         objectives = []
+        epoch_training_time = 0
+        epoch_metrics_time = 0
         for i_batch, sample_batched in enumerate(dataloader):
             global_step += 1
+            batch_start_time = time.time()
             data_sample = sample_batched[0].to(device)
 
             # Get model samples, either from replay buffer or noise.
@@ -79,20 +83,32 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             objective.backward()
             torch.nn.utils.clip_grad.clip_grad_value_(net.parameters(), 1e2)
             optimizer.step()
+
+            batch_training_time = time.time() - batch_start_time
+            epoch_training_time += batch_training_time
             objectives.append(objective)
-            if verbose:
-                print(f"on epoch {epoch}, batch {i_batch}, objective: {objective}")
             tb_writer.add_scalar(tag="loss/objective", scalar_value=objective, global_step=global_step)
+
+            tr_metrics_start_time = time.time()
             for callback in ckpt_callbacks:
                 callback(net=net, data_sample=data_sample,
                          model_sample=model_sample, epoch=epoch,
                          global_step=global_step, validation=False)
+            tr_metrics_time = time.time() - tr_metrics_start_time
+            epoch_metrics_time += tr_metrics_time
+            if verbose:
+                print(f"on epoch {epoch}, batch {i_batch}, objective: {objective}")
+                print(f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s")
 
+        valid_metrics_start_time = time.time()
         for callback in ckpt_callbacks:
             callback(net=net, data_sample=data_sample,
                      model_sample=model_sample, epoch=epoch,
                      global_step=global_step, validation=True)
+        valid_metrics_time = time.time() - valid_metrics_start_time
+        epoch_metrics_time += valid_metrics_time
 
-        print(f"on epoch {epoch}, objective: {sum(objectives) / len(objectives)}")
+        print(f"on epoch {epoch}, objective: {sum(objectives) / len(objectives)}, validation metrics time: {valid_metrics_time:0.3f}")
+        print(f"total training time: {epoch_training_time:0.3f}s, total metrics time: {epoch_metrics_time:0.3f}s, validation metrics time: {valid_metrics_time:0.3f}s")
 
     return net, optimizer
