@@ -154,19 +154,19 @@ class ResnetEnergyModel(BaseEnergyModel):
                 self.internal_layers.append(res_net_layer)
                 in_channels = num_units
 
-            down_sample = BasicResnetBlock(
-                in_channels=in_channels,
-                out_channels=num_units,
-                norm_layer=None,
-                stride=2
-            )
-            # maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=0)
+            # down_sample = BasicResnetBlock(
+            #     in_channels=in_channels,
+            #     out_channels=num_units,
+            #     norm_layer=None,
+            #     stride=2
+            # )
+            avg_pool = nn.AvgPool2d(kernel_size=2, padding=0)
             # w -= kernel_size[1] - 1
             # h -= kernel_size[0] - 1
             w //= 2
             h //= 2
-            self.internal_layers.append(down_sample)
-        self.dense_size=w*h*num_units
+            self.internal_layers.append(avg_pool)
+        self.dense_size=num_units
         dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
@@ -186,6 +186,6 @@ class ResnetEnergyModel(BaseEnergyModel):
         for layer in self.internal_layers[:-1]:
             x = layer(x)
             x = F.leaky_relu(x)
-        x = torch.reshape(x, (n, self.dense_size))
+        x = torch.sum(x, dim=[2, 3])  # spatial sum
         x = self.internal_layers[-1](x)
         return x
