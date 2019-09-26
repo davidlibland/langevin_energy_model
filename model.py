@@ -81,10 +81,10 @@ class BaseEnergyModel(nn.Module):
 class SimpleEnergyModel(BaseEnergyModel):
     def __init__(self, num_inputs, num_layers, num_units, prior_scale=LANG_INIT_NS):
         super().__init__(num_features=num_inputs, prior_scale=prior_scale)
-        input_layer = nn.Linear(num_inputs, num_units)
+        input_layer = nn.utils.spectral_norm(nn.Linear(num_inputs, num_units))
         self.internal_layers = nn.ModuleList([input_layer])
         for _ in range(num_layers-2):
-            layer = nn.Linear(num_units, num_units)
+            layer = nn.utils.spectral_norm(nn.Linear(num_units, num_units))
             self.internal_layers.append(layer)
         output_layer = nn.Linear(num_units, 1)
         self.internal_layers.append(output_layer)
@@ -118,7 +118,7 @@ class ConvEnergyModel(BaseEnergyModel):
             in_channels = num_units
             self.internal_layers.append(layer)
         self.dense_size=w*h*num_units
-        dense_layer = nn.utils.spectral_norm(nn.Linear(self.dense_size, 1))
+        dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
 
@@ -167,7 +167,7 @@ class ResnetEnergyModel(BaseEnergyModel):
             h //= 2
             self.internal_layers.append(down_sample)
         self.dense_size=w*h*num_units
-        dense_layer = nn.utils.spectral_norm(nn.Linear(self.dense_size, 1))
+        dense_layer = nn.Linear(self.dense_size, 1)
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
 
