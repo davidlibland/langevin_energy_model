@@ -1,4 +1,5 @@
 import torch
+from toolz import curry
 
 from mcmc.abstract import MCSampler
 
@@ -61,6 +62,7 @@ class MALASampler(MCSampler):
         eps = ((x_ - x +lr*grad_x)**2).sum(dim=1, keepdim=True)
         return -eps/(4*lr)
 
+    @curry
     def log_metrics(self, tb_writer, global_step: int, **kwargs):
         """Log any metrics to the tb_logger"""
         tb_writer.add_scalar("mala/lr", scalar_value=self.lr, global_step=global_step)

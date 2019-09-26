@@ -38,30 +38,33 @@ def setup_2d():
     return dist, net
 
 
-def setup_sm_digits_base():
+def setup_sm_digits_simple():
     dist = get_approx_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
     net = SimpleEnergyModel(16, 3, 60, prior_scale=5*scale)
     return dist, net
 
 
-def setup_sm_digits():
+def setup_sm_digits(model="conv"):
     dist = get_approx_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
-    net = ConvEnergyModel((1, 4, 4), 2, 12, prior_scale=5*scale)
+    if model == "resnet":
+        net = ResnetEnergyModel((1, 4, 4), 2, 2, 12, prior_scale=5*scale)
+    else:
+        net = ConvEnergyModel((1, 4, 4), 2, 12, prior_scale=5*scale)
     return dist, net
 
 
-def setup_digits():
+def setup_digits(model="conv"):
     dist = get_approx_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
-    net = ConvEnergyModel((1, 8, 8), 3, 25, prior_scale=5*scale)
+    if model == "resnet":
+        net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
+    else:
+        net = ConvEnergyModel((1, 8, 8), 3, 25, prior_scale=5*scale)
     return dist, net
 
 
@@ -75,7 +78,7 @@ def setup_mnist():
 
 def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
          num_mc_steps=10):
-    dist, net = setup_2d()
+    dist, net = setup_sm_digits()
     samples = dist.rvs(1000)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))

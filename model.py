@@ -108,17 +108,17 @@ class ConvEnergyModel(BaseEnergyModel):
         in_channels = c
         kernel_size = (3, 3)
         for _ in range(num_layers-1):
-            layer = nn.Conv2d(
+            layer = nn.utils.spectral_norm(nn.Conv2d(
                 in_channels=in_channels,
                 out_channels=num_units,
                 kernel_size=kernel_size
-            )
+            ))
             w -= kernel_size[1] - 1
             h -= kernel_size[0] - 1
             in_channels = num_units
             self.internal_layers.append(layer)
         self.dense_size=w*h*num_units
-        dense_layer = nn.Linear(self.dense_size, 1)
+        dense_layer = nn.utils.spectral_norm(nn.Linear(self.dense_size, 1))
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
 
@@ -167,7 +167,7 @@ class ResnetEnergyModel(BaseEnergyModel):
             h //= 2
             self.internal_layers.append(down_sample)
         self.dense_size=w*h*num_units
-        dense_layer = nn.Linear(self.dense_size, 1)
+        dense_layer = nn.utils.spectral_norm(nn.Linear(self.dense_size, 1))
         self.internal_layers.append(dense_layer)
         # ToDo: Add weight initialization
 

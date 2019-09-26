@@ -26,7 +26,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
           ckpt_callbacks: List[CheckpointCallback]=None):
     if ckpt_callbacks is None:
         ckpt_callbacks = []
-    ckpt_callbacks.append(lambda **kwargs: net.sampler.log_metrics(tb_writer, **kwargs))
+    ckpt_callbacks.append(net.sampler.log_metrics(tb_writer))
     if optimizer is None:
         optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(

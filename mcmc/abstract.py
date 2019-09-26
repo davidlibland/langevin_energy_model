@@ -1,4 +1,5 @@
 import torch
+from toolz import curry
 
 
 class MCSampler:
@@ -6,6 +7,7 @@ class MCSampler:
         """Perform a single MC step."""
         raise NotImplementedError
 
+    @curry
     def log_metrics(self, tb_writer, global_step: int, **kwargs):
         """Log any metrics to the tb_logger"""
         pass
