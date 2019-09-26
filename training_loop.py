@@ -21,8 +21,7 @@ class CheckpointCallback:
 
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
-          batch_size=100, optimizer=None, num_mc_steps=20,
-          mc_lr=1e-1, verbose=True,
+          batch_size=100, optimizer=None, num_mc_steps=20, verbose=True,
           ckpt_callbacks: List[CheckpointCallback]=None):
     if ckpt_callbacks is None:
         ckpt_callbacks = []
