@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Tuple
 
 import torch
@@ -5,6 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
 
+from mcmc.mala import MALASampler
 from model import BaseEnergyModel
 from training_loop import CheckpointCallback
 
@@ -13,7 +15,7 @@ class AISLoss(CheckpointCallback):
     def __init__(self, tb_writer: SummaryWriter, beta_schedule=None,
                  num_chains: int=20, num_mc_steps=1,
                  log_z_update_interval=5, device=None,
-                 mc_dynamics="mala", **mc_kwargs):
+                 mc_dynamics=None):
         if beta_schedule is None:
             beta_schedule = self.build_schedule(
                 ("arith", .01, 200),
@@ -28,10 +30,12 @@ class AISLoss(CheckpointCallback):
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = device
         self.log_z = None
+        if mc_dynamics is None:
+            mc_dynamics = MALASampler(lr=0.1)
         self.mc_dynamics = mc_dynamics
-        self.mc_kwargs = mc_kwargs
 
     def update_log_z(self, net: BaseEnergyModel):
+        """Update the estimate of log_Z"""
         net.eval()
         current_samples = net.sample_from_prior(self.num_chains, device=self.device)
         log_w = net(current_samples, beta=0)
@@ -40,14 +44,14 @@ class AISLoss(CheckpointCallback):
             current_samples = net.sample_fantasy(current_samples,
                                                  num_mc_steps=self.num_mc_steps,
                                                  beta=beta,
-                                                 mc_dynamics=self.mc_dynamics,
-                                                 mc_kwargs=self.mc_kwargs
+                                                 mc_dynamics=self.mc_dynamics
                                                  )
             log_w += net(current_samples, beta=beta)
         log_w -= net(current_samples, beta=self.beta_schedule[-1])
 
-        log_ratio = torch.logsumexp(log_w, dim=0) - np.log(self.num_chains)
-        self.log_z = log_ratio
+        self.log_z = torch.logsumexp(log_w, dim=0) - np.log(self.num_chains)
+
+        # Compute diagnostic stats:
         self.log_w = log_w
         self.log_w_var = torch.var(self.log_w).cpu()
         exp_std = torch.exp(self.log_w_var)

@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import scipy.special as scisp
 
+from mcmc.langevin import LangevinSampler
+from mcmc.mala import MALASampler
 from model import BaseEnergyModel
 from model import LANG_INIT_NS
 from utils.ais import AISLoss
@@ -54,12 +56,12 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=.1):
         ("arith", .01, 200),
         ("geom", 1., 1000)
     )
-    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics="mala", lr=lr)
+    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=MALASampler(lr=lr))
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(tb_writer.loss)
 
-    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics="langevin", lr=lr)
+    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=LangevinSampler(lr=lr))
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(tb_writer.loss)

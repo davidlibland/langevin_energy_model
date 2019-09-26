@@ -12,7 +12,7 @@ from model import BaseEnergyModel
 from utils.logging import tb_writer
 
 MAX_REPLAY = 30
-REPLAY_PROB = .95
+REPLAY_PROB = .99
 
 
 class CheckpointCallback:
@@ -26,6 +26,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
           ckpt_callbacks: List[CheckpointCallback]=None):
     if ckpt_callbacks is None:
         ckpt_callbacks = []
+    ckpt_callbacks.append(lambda **kwargs: net.sampler.log_metrics(tb_writer, **kwargs))
     if optimizer is None:
         optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(
@@ -40,7 +41,6 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
     print(f"training on {len(dataset)} samples using {device}.")
     global_step = 0
     model_samples = None
-    mc_kwargs = {"lr": mc_lr}
     for epoch in range(num_epochs):
         objectives = []
         for i_batch, sample_batched in enumerate(dataloader):
@@ -69,8 +69,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
 
             net.eval()
             model_sample = net.sample_fantasy(model_sample,
-                                              num_mc_steps=num_mc_steps,
-                                              mc_kwargs=mc_kwargs).detach()
+                                              num_mc_steps=num_mc_steps).detach()
 
             model_samples.append(model_sample)
 
@@ -83,7 +82,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             optimizer.step()
             objectives.append(objective)
             if verbose:
-                print(f"on epoch {epoch}, batch {i_batch}, objective: {objective}, mc: {mc_kwargs}")
+                print(f"on epoch {epoch}, batch {i_batch}, objective: {objective}")
             tb_writer.add_scalar(tag="loss/objective", scalar_value=objective, global_step=global_step)
             for callback in ckpt_callbacks:
                 callback(net=net, data_sample=data_sample,
@@ -95,6 +94,6 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
                      model_sample=model_sample, epoch=epoch,
                      global_step=global_step, validation=True)
 
-        print(f"on epoch {epoch}, objective: {sum(objectives) / len(objectives)}, mc: {mc_kwargs}")
+        print(f"on epoch {epoch}, objective: {sum(objectives) / len(objectives)}")
 
     return net, optimizer

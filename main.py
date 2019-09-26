@@ -60,7 +60,8 @@ def setup_digits():
     dist = get_approx_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
+    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
+    net = ConvEnergyModel((1, 8, 8), 3, 25, prior_scale=5*scale)
     return dist, net
 
 
@@ -88,7 +89,7 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
     tb_writer.add_figure(tag="data", figure=fig)
     plt.close(fig)
 
-    optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
+    optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-1)
 
     def save_images(model_sample, global_step, epoch, validation, **kwargs):
         if validation:
@@ -101,7 +102,7 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
             tb_writer.add_figure(tag="data", figure=fig, global_step=global_step)
             plt.close(fig)
 
-    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10, lr=.1)
+    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10)
 
     net, optimizer = train(net, dataset, num_epochs=num_epochs,
                            optimizer=optimizer,
@@ -109,4 +110,4 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
                            ckpt_callbacks=[save_images, ais_loss])
 
 if __name__ == '__main__':
-    main(lr=1e-3, num_epochs=1000, show=False, num_mc_steps=100)
+    main(lr=1e-2, num_epochs=1000, show=False, num_mc_steps=500)
