@@ -54,7 +54,7 @@ def setup_mnist():
 
 def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
          num_mc_steps=10):
-    dist, net = setup_digits()
+    dist, net = setup_2d()
     samples = dist.rvs(1000)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
@@ -81,7 +81,7 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
             tb_writer.add_figure(tag="data", figure=fig, global_step=global_step)
             plt.close(fig)
 
-    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10)
+    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10, lr=.1)
 
     net, optimizer = train(net, dataset, num_epochs=num_epochs,
                            optimizer=optimizer,
@@ -89,4 +89,4 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
                            ckpt_callbacks=[save_images, ais_loss])
 
 if __name__ == '__main__':
-    main(lr=1e-3, num_epochs=1000, show=False, num_mc_steps=5)
+    main(lr=1e-3, num_epochs=1000, show=False, num_mc_steps=100)

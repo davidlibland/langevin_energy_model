@@ -11,7 +11,7 @@ from model import BaseEnergyModel
 # Globals
 from utils.logging import tb_writer
 
-MAX_REPLAY = 1000
+MAX_REPLAY = 30
 REPLAY_PROB = .95
 
 
@@ -22,7 +22,7 @@ class CheckpointCallback:
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
           batch_size=100, optimizer=None, num_mc_steps=20,
-          mc_lr=1., verbose=True,
+          mc_lr=1e-1, verbose=True,
           ckpt_callbacks: List[CheckpointCallback]=None):
     if ckpt_callbacks is None:
         ckpt_callbacks = []
@@ -40,8 +40,9 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
     print(f"training on {len(dataset)} samples using {device}.")
     global_step = 0
     model_samples = None
+    mc_kwargs = {"lr": mc_lr}
     for epoch in range(num_epochs):
-        losses = []
+        objectives = []
         for i_batch, sample_batched in enumerate(dataloader):
             global_step += 1
             data_sample = sample_batched[0].to(device)
@@ -69,20 +70,21 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             net.eval()
             model_sample = net.sample_fantasy(model_sample,
                                               num_mc_steps=num_mc_steps,
-                                              lr=mc_lr).detach()
+                                              mc_kwargs=mc_kwargs).detach()
+
             model_samples.append(model_sample)
 
             # Forward gradient:
             net.train()
             net.zero_grad()
-            loss = (net(data_sample) - net(model_sample)).mean()
-            loss.backward()
+            objective = net(data_sample).mean() - net(model_sample).mean()
+            objective.backward()
             torch.nn.utils.clip_grad.clip_grad_value_(net.parameters(), 1e2)
             optimizer.step()
-            losses.append(loss)
+            objectives.append(objective)
             if verbose:
-                print(f"on epoch {epoch}, batch {i_batch}, loss: {loss}")
-            tb_writer.add_scalar(tag="loss/objective", scalar_value=loss, global_step=global_step)
+                print(f"on epoch {epoch}, batch {i_batch}, objective: {objective}, mc: {mc_kwargs}")
+            tb_writer.add_scalar(tag="loss/objective", scalar_value=objective, global_step=global_step)
             for callback in ckpt_callbacks:
                 callback(net=net, data_sample=data_sample,
                          model_sample=model_sample, epoch=epoch,
@@ -93,6 +95,6 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
                      model_sample=model_sample, epoch=epoch,
                      global_step=global_step, validation=True)
 
-        print(f"on epoch {epoch}, loss: {sum(losses) / len(losses)}")
+        print(f"on epoch {epoch}, objective: {sum(objectives) / len(objectives)}, mc: {mc_kwargs}")
 
     return net, optimizer

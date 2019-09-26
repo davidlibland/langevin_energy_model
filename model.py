@@ -23,7 +23,7 @@ class BaseEnergyModel(nn.Module):
         return torch.randn(size, self.num_features, device=device)*self.prior_scale
 
     def sample_fantasy(self, x: torch.Tensor=None, num_mc_steps=100, beta=None,
-                       num_samples=None, mc_dynamics="langevin", **kwargs):
+                       num_samples=None, mc_dynamics="mala", mc_kwargs=None):
         """
         Sample fantasy particles.
 
@@ -47,10 +47,15 @@ class BaseEnergyModel(nn.Module):
                 "be specified."
             x = self.sample_from_prior(num_samples)
         mc_transition = {
-           "langevin":  self.langavin_fantasy_step
+           "langevin":  self.langavin_fantasy_step,
+            "mala": self.mala_fantasy_step
         }.get(mc_dynamics, self.langavin_fantasy_step)
+        if mc_kwargs is None:
+            mc_kwargs = {}
         for _ in range(num_mc_steps):
-            x = mc_transition(x, beta=beta, **kwargs)
+            x, new_kwargs = mc_transition(x, beta=beta, **mc_kwargs)
+            for key in new_kwargs:
+                mc_kwargs[key] = new_kwargs[key]
         return x
 
     def langavin_fantasy_step(self, x: torch.Tensor, beta=None, lr=1e-3, **kwargs):
@@ -67,7 +72,49 @@ class BaseEnergyModel(nn.Module):
 
         noise_scale = torch.sqrt(torch.as_tensor(lr*2))
         result = x - lr*grad_x+noise_scale*torch.randn_like(x)
-        return result.detach()
+        return result.detach(), {}
+
+    def mala_fantasy_step(self, x: torch.Tensor, beta=None, lr=1e-3, **kwargs):
+        """Perform a single langevin MC update."""
+        x.requires_grad_(True)
+        if x.grad is not None:
+            x.grad.data.zero_()
+        y = self(x, beta=beta)
+        y.sum().backward()
+        grad_x = x.grad
+
+        lr_initial = lr
+        # Hack to keep gradients in control:
+        lr = lr/max(1, grad_x.abs().max())
+
+        noise_scale = torch.sqrt(torch.as_tensor(lr*2))
+        x_det = (x - lr*grad_x).detach()
+        noise_f = noise_scale*torch.randn_like(x)
+        x_ = x_det+noise_f
+
+        log_q_x_x = -(noise_f**2).sum(dim=1, keepdim=True)/(4*lr)
+
+        x_.requires_grad_(True)
+        if x_.grad is not None:
+            x_.grad.data.zero_()
+        y_ = self(x_, beta=beta)
+        y_.sum().backward()
+        grad_x_ = x_.grad
+
+        eps = ((x - x_ + lr * grad_x_) ** 2).sum(dim=1, keepdim=True)
+        log_q_xx_ = -eps/(4*lr)
+
+        log_alpha = y - y_ + log_q_xx_ - log_q_x_x
+        alpha = torch.exp(torch.clamp_max(log_alpha, 0))
+        mask = torch.rand(x.shape[0], 1) < alpha
+        # adjust the learning rate based on the acceptance ratio:
+        acceptance_ratio = torch.mean(mask.float()).float()
+        if acceptance_ratio.float() < .4:
+            lr = lr_initial / 1.1
+        elif acceptance_ratio.float() > .7:
+            lr = lr_initial * 1.1
+        ac_r = float(0.1*acceptance_ratio+.9*kwargs.get("acceptance_prob", 0.5))
+        return torch.where(mask, x_, x).detach(), {"lr": lr, "acceptance_prob": ac_r}
 
     def energy(self, x):
         """Override this in subclasses"""

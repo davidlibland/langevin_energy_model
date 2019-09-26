@@ -10,7 +10,10 @@ from training_loop import CheckpointCallback
 
 
 class AISLoss(CheckpointCallback):
-    def __init__(self, tb_writer: SummaryWriter, beta_schedule=None, num_chains: int=20, num_mc_steps=1, log_z_update_interval=5, device=None):
+    def __init__(self, tb_writer: SummaryWriter, beta_schedule=None,
+                 num_chains: int=20, num_mc_steps=1,
+                 log_z_update_interval=5, device=None,
+                 mc_dynamics="mala", **mc_kwargs):
         if beta_schedule is None:
             beta_schedule = self.build_schedule(
                 ("arith", .01, 200),
@@ -25,6 +28,8 @@ class AISLoss(CheckpointCallback):
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = device
         self.log_z = None
+        self.mc_dynamics = mc_dynamics
+        self.mc_kwargs = mc_kwargs
 
     def update_log_z(self, net: BaseEnergyModel):
         net.eval()
@@ -32,7 +37,12 @@ class AISLoss(CheckpointCallback):
         log_w = net(current_samples, beta=0)
         for beta in self.beta_schedule[1:-1]:
             log_w -= net(current_samples, beta=beta)
-            current_samples = net.sample_fantasy(current_samples, num_mc_steps=self.num_mc_steps, beta=beta)
+            current_samples = net.sample_fantasy(current_samples,
+                                                 num_mc_steps=self.num_mc_steps,
+                                                 beta=beta,
+                                                 mc_dynamics=self.mc_dynamics,
+                                                 mc_kwargs=self.mc_kwargs
+                                                 )
             log_w += net(current_samples, beta=beta)
         log_w -= net(current_samples, beta=self.beta_schedule[-1])
 

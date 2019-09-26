@@ -38,7 +38,7 @@ class MockTBWriter:
         pass
 
 
-def test_ais_loss(num_features=2, num_samples=200, num_chains=1000):
+def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=.1):
     net = DiagonalNormalModel(num_features=num_features)
     X = torch.randn(num_samples, num_features)
     N = num_chains
@@ -54,7 +54,12 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000):
         ("arith", .01, 200),
         ("geom", 1., 1000)
     )
-    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N)
+    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics="mala", lr=lr)
+
+    ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
+    print(tb_writer.loss)
+
+    ais_loss_obj = AISLoss(tb_writer=tb_writer, beta_schedule=beta_schedule, num_chains=N, mc_dynamics="langevin", lr=lr)
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(tb_writer.loss)
