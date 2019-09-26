@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from distributions.core import Distribution, Normal
 from distributions.mnist import get_approx_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
+from distributions.small_digits import get_approx_sm_digit_distribution
+from model import ConvEnergyModel
 from model import SimpleEnergyModel, ResnetEnergyModel
 from training_loop import train
 from utils.ais import AISLoss
@@ -33,6 +35,24 @@ def setup_2d():
         Normal(np.array([15, 1])),
     ])
     net = SimpleEnergyModel(2, 3, 25)
+    return dist, net
+
+
+def setup_sm_digits_base():
+    dist = get_approx_sm_digit_distribution()
+    n = 1000
+    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
+    net = SimpleEnergyModel(16, 3, 60, prior_scale=5*scale)
+    return dist, net
+
+
+def setup_sm_digits():
+    dist = get_approx_sm_digit_distribution()
+    n = 1000
+    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    # net = ResnetEnergyModel((1, 8, 8), 3, 2, 25, prior_scale=5*scale)
+    net = ConvEnergyModel((1, 4, 4), 2, 12, prior_scale=5*scale)
     return dist, net
 
 
