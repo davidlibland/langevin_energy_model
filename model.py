@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mcmc.abstract import MCSampler
-from mcmc.langevin import LangevinSampler
 from mcmc.mala import MALASampler
 from utils.resnet import BasicBlock as BasicResnetBlock
 from utils.resnet import Swish
@@ -141,7 +140,7 @@ class ResnetEnergyModel(BaseEnergyModel):
         self.input_shape = input_shape
         self.internal_layers = nn.ModuleList()
         in_channels = c + 1
-        kernel_size = (3, 3)
+        # kernel_size = (3, 3)
         for _ in range(num_layers-1):
             for _ in range(num_resnets):
                 res_net_layer = BasicResnetBlock(

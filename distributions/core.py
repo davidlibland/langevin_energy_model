@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from math import pi, sqrt
 from typing import Optional, List, Callable
 
-from matplotlib.figure import Figure
 from sklearn.mixture import GaussianMixture
 from scipy.special import logsumexp
 import matplotlib.pyplot as plt
