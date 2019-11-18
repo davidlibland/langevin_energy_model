@@ -7,11 +7,9 @@ from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from toolz import curry
 
-from distributions.core import Distribution, Normal, ApplyTransform
-
 
 def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
-                        covariance_type="spherical") -> Distribution:
+                        covariance_type="spherical") -> "Distribution":
     """
     Returns a GMM approximating the leading components of X.
 
@@ -23,6 +21,7 @@ def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
     Returns:
         Distribution modeling the leading PCA components of X.
     """
+    from distributions.core import Normal, ApplyTransform
     dec = PCA(n_components=n_pca_comp, whiten=True)
     clf = GaussianMixture(n_components=n_mixtures, covariance_type=covariance_type)
     dec.fit(X)

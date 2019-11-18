@@ -10,6 +10,8 @@ from distributions.core import Distribution, Normal
 from distributions.mnist import get_approx_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
 from distributions.small_digits import get_approx_sm_digit_distribution
+from distributions.small_patterns import get_approx_pattern_distribution
+from mcmc.mala import MALASampler
 from model import ConvEnergyModel
 from model import SimpleEnergyModel, ResnetEnergyModel
 from training_loop import train
@@ -35,6 +37,14 @@ def setup_2d():
         Normal(np.array([15, 1])),
     ])
     net = SimpleEnergyModel(2, 3, 25)
+    return dist, net
+
+
+def setup_patterns(patterns=("checkerboard_2x2", "diagonal_gradient_2x2")):
+    dist = get_approx_pattern_distribution(patterns)
+    n = 1000
+    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    net = ResnetEnergyModel((1, 2, 2), 2, 3, 12, prior_scale=5*scale)
     return dist, net
 
 
@@ -77,9 +87,10 @@ def setup_mnist():
 
 
 def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
-         num_mc_steps=10):
-    dist, net = setup_sm_digits()
-    samples = dist.rvs(1000)
+         num_mc_steps=10, num_sample_mc_steps=10000, sample_beta=0.1):
+    # dist, net = setup_digits("resnet")
+    dist, net = setup_sm_digits_simple()
+    samples = dist.rvs(10000)
     print(samples.shape)
     dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
     energy = lambda x: net(torch.tensor(x, dtype=torch.float)).detach().numpy()
@@ -94,23 +105,56 @@ def main(lr=1e-2, num_epochs=10, fname="samples", show=True,
 
     optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-1)
 
-    def save_images(model_sample, global_step, epoch, validation, **kwargs):
-        if validation:
+    sampler = MALASampler(lr=0.1)
+    samples = None
+
+    def save_images(model_sample, global_step, epoch, validation, net, **kwargs):
+        nonlocal samples
+        if validation and epoch % 5 != 0:
             fig = plt.figure()
+            net.eval()
             dist.visualize(fig, model_sample.cpu(), energy)
             if show:
                 plt.show()
             if fname:
                 fig.savefig(os.path.join(RUN_DIR, f"{fname}_{epoch}.png"))
-            tb_writer.add_figure(tag="data", figure=fig, global_step=global_step)
+            tb_writer.add_figure(tag="negative_samples", figure=fig, global_step=global_step)
+            plt.close(fig)
+        elif validation:
+            fig = plt.figure()
+            net.eval()
+            samples = net.sample_fantasy(x=samples,
+                                         num_mc_steps=num_sample_mc_steps,
+                                         beta=sample_beta,
+                                         mc_dynamics=sampler,
+                                         num_samples=36
+                                         ).detach().cpu()
+            dist.visualize(fig, samples, energy)
+            if show:
+                plt.show()
+            if fname:
+                fig.savefig(os.path.join(RUN_DIR, f"{fname}_{epoch}.png"))
+            tb_writer.add_figure(tag="model_samples", figure=fig, global_step=global_step)
             plt.close(fig)
 
-    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=10)
+    def save_model(net, epoch, validation, **kwargs):
+        if validation and epoch % 5 != 0:
+            ckpt_fn = os.path.join(RUN_DIR, f"ckpt_{epoch}.pkl")
+            torch.save({
+                    "epoch": epoch,
+                    "model": net.state_dict(),
+                    "optimizer": optimizer.state_dict()
+                }, ckpt_fn
+            )
+
+    ais_loss = AISLoss(tb_writer=tb_writer, log_z_update_interval=9,
+                       particle_filter=False, optimizer=optimizer,
+                       lr_decay_factor=0.95)
 
     net, optimizer = train(net, dataset, num_epochs=num_epochs,
                            optimizer=optimizer,
                            num_mc_steps=num_mc_steps,
-                           ckpt_callbacks=[save_images, ais_loss])
+                           ckpt_callbacks=[save_images, ais_loss, save_model])
 
 if __name__ == '__main__':
-    main(lr=1e-2, num_epochs=1000, show=False, num_mc_steps=500)
+    main(lr=1e-2, num_epochs=1000, show=False, num_mc_steps=10)

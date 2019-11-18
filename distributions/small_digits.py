@@ -4,10 +4,24 @@ import numpy as np
 import torch
 from sklearn.datasets import load_digits
 
+from distributions.core import Sampler, Distribution
 from distributions.utils import train_gmm_pca_model, plot_image_samples, \
     get_samples
-from .core import Distribution
 
+
+@lru_cache()
+def get_mnist_distribution() -> Sampler:
+    """
+    Returns a Digits Sampler.
+
+    Returns:
+        Sampler: Sampling digits
+    """
+    X, y = load_digits(return_X_y=True)
+    X = X.astype(np.float)/X.max()
+    digit_dist = Sampler.from_samples(X)
+    digit_dist.visualize = plot_image_samples([8, 8], False)
+    return digit_dist
 
 @lru_cache()
 def get_approx_sm_digit_distribution(n_pca_comp=10, n_mixtures=5,

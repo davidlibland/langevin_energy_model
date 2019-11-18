@@ -18,8 +18,8 @@ class AISLoss(CheckpointCallback):
                  mc_dynamics=None):
         if beta_schedule is None:
             beta_schedule = self.build_schedule(
-                ("arith", .01, 200),
-                ("geom", 1., 1000)
+                ("arith", .01, 60),
+                ("geom", 1., 300)
             )
         self.beta_schedule = beta_schedule
         self.num_chains = num_chains

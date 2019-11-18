@@ -11,23 +11,16 @@ from scipy.special import logsumexp
 import matplotlib.pyplot as plt
 import numpy as np
 
+from distributions.utils import get_samples
 
-class Distribution(ABC):
-    @abstractmethod
-    def logpdf(self, X) -> np.ndarray:
-        """
-        The log pdf of values X.
 
-        Args:
-            X (tensor ~ (n_samples, n_features)): The values at which to compute
-                the pdf
+class Sampler(ABC):
+    @staticmethod
+    def from_samples(X: np.ndarray) -> np.ndarray:
+        sampler = Sampler()
+        sampler.rvs = get_samples(X)
+        return sampler
 
-        Returns:
-            tensor ~ (n_samples,)
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def rvs(self, size: int) -> np.ndarray:
         """
         Sample from the distribution.
@@ -90,6 +83,22 @@ class Distribution(ABC):
             tsne = TSNE(n_components=2)
             emb = tsne.fit_transform(X)
             ax.scatter(emb[:, 0], emb[:, 1])
+
+
+class Distribution(Sampler):
+    @abstractmethod
+    def logpdf(self, X) -> np.ndarray:
+        """
+        The log pdf of values X.
+
+        Args:
+            X (tensor ~ (n_samples, n_features)): The values at which to compute
+                the pdf
+
+        Returns:
+            tensor ~ (n_samples,)
+        """
+        raise NotImplementedError
 
     @staticmethod
     def mixture(components: List["Distribution"], weights: Optional[List[float]]=None):

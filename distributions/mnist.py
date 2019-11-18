@@ -3,9 +3,23 @@ from functools import lru_cache
 import numpy as np
 from sklearn.datasets import fetch_openml
 
-from distributions.utils import train_gmm_pca_model, plot_image_samples, \
-    get_samples
-from .core import Distribution
+from distributions.core import Distribution, Sampler
+from distributions.utils import plot_image_samples, get_samples, train_gmm_pca_model
+
+@lru_cache()
+def get_mnist_distribution() -> Sampler:
+    """
+    Returns a MNIST sampler.
+
+    Returns:
+        Sampler: Sampling mnist digits
+    """
+    X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
+    X = X.astype(np.float)/X.max()
+    mnist_dist = Sampler.from_samples(X)
+    mnist_dist.visualize = plot_image_samples([28, 28], False)
+    return mnist_dist
+
 
 @lru_cache()
 def get_approx_mnist_distribution(n_pca_comp=10, n_mixtures=5,
