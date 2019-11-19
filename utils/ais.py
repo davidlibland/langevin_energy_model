@@ -1,8 +1,9 @@
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Callable
 from typing import Tuple
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
 
@@ -11,25 +12,32 @@ from model import BaseEnergyModel
 from training_loop import CheckpointCallback
 
 
+@dataclass
+class AISState:
+    log_w0: torch.Tensor
+    log_p0: torch.Tensor
+    current_samples: torch.Tensor
+
+
 class AISLoss(CheckpointCallback):
-    def __init__(self, tb_writer: SummaryWriter, beta_schedule=None,
+    def __init__(self, logger: Callable, beta_schedule=None,
                  num_chains: int=20, num_mc_steps=1,
                  log_z_update_interval=5, device=None,
                  mc_dynamics=None):
         if beta_schedule is None:
             beta_schedule = self.build_schedule(
-                ("arith", .01, 60),
-                ("geom", 1., 300)
+                ("arith", .01, 200),
+                ("geom", 1., 1000)
             )
         self.beta_schedule = beta_schedule
         self.num_chains = num_chains
-        self.tb_writer = tb_writer
+        self.logger = logger
         self.log_z_update_interval = log_z_update_interval
         self.num_mc_steps = num_mc_steps
         if device is None:
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = device
-        self.log_z = None
+        self._sample_state = None
         if mc_dynamics is None:
             mc_dynamics = MALASampler(lr=0.1)
         self.mc_dynamics = mc_dynamics
@@ -49,31 +57,57 @@ class AISLoss(CheckpointCallback):
             log_w += net(current_samples, beta=beta)
         log_w -= net(current_samples, beta=self.beta_schedule[-1])
 
-        self.log_z = torch.logsumexp(log_w, dim=0) - np.log(self.num_chains)
-
-        # Compute diagnostic stats:
-        self.log_w = log_w
-        self.log_w_var = torch.var(self.log_w).cpu()
-        exp_std = torch.exp(self.log_w_var)
-        if exp_std == 0:
-            self.effective_sample_size = float("inf")
-        elif not torch.isfinite(exp_std):
-            self.effective_sample_size = 0
-        else:
-            self.effective_sample_size = float(self.num_chains / exp_std.cpu())
+        # Store the weights:
+        self._sample_state = AISState(
+            log_w0=log_w,
+            log_p0=-net(current_samples),
+            current_samples=current_samples,
+        )
 
     def __call__(self, net: BaseEnergyModel, data_sample, global_step, **kwargs):
-        if global_step % self.log_z_update_interval == 0:
+        if self._sample_state is None or global_step % self.log_z_update_interval == 0:
             self.update_log_z(net)
-            self.tb_writer.add_scalar("ais/log_w_var", scalar_value=self.log_w_var.cpu(), global_step=global_step)
-            self.tb_writer.add_scalar("ais/effective_sample_size", scalar_value=self.effective_sample_size, global_step=global_step)
-            self.tb_writer.add_histogram("ais/log_w", values=self.log_w.cpu(), global_step=global_step)
-        if self.log_z is None:
-            return
-        net.eval()
-        loss = float(net(data_sample).mean().cpu()+self.log_z)
-        self.tb_writer.add_scalar("loss/ais", scalar_value=loss, global_step=global_step)
 
+        # compute log_z
+        net.eval()
+        # get the correction to the log_weights:
+        log_p1 = -net(self._sample_state.current_samples)
+        log_w = log_p1 - self._sample_state.log_p0 + self._sample_state.log_w0
+        num_chains = log_w.shape[0]
+        log_z = torch.logsumexp(log_w, dim=0) - np.log(num_chains)
+
+        loss = float(net(data_sample).mean().cpu()+log_z)
+
+        # log the loss:
+
+        # get the diagnostics
+        log_w_var, effective_sample_size = self.get_diagnostic_stats(log_w)
+        self.logger(loss_ais=loss,
+                    ais_log_w_var=float(log_w_var.cpu()),
+                    ais_effective_sample_size=effective_sample_size
+                    )
+
+    @staticmethod
+    def get_diagnostic_stats(log_w) -> Tuple:
+        """
+        Returns diagnostic stats for a set of log weights.
+
+        Args:
+            log_w: The weights to diagnose
+
+        Returns:
+            Tuple: log variance of the weights, the effective sample size
+        """
+        num_chains = log_w.shape[0]
+        log_w_var = torch.var(log_w).cpu()
+        exp_std = torch.exp(log_w_var)
+        if exp_std == 0:
+            effective_sample_size = float("inf")
+        elif not torch.isfinite(exp_std):
+            effective_sample_size = 0
+        else:
+            effective_sample_size = float(num_chains / exp_std.cpu())
+        return log_w_var, effective_sample_size
 
     @staticmethod
     def build_schedule(*instructions: Tuple[str, float, int]) -> np.ndarray:
@@ -124,4 +158,3 @@ class AISLoss(CheckpointCallback):
         schedule = np.concatenate(sequence).flatten()
         schedule[-1] = 1  # Ensure it ends at 1 (despite numerical errors).
         return schedule
-

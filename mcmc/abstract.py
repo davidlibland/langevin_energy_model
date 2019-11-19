@@ -8,6 +8,6 @@ class MCSampler:
         raise NotImplementedError
 
     @curry
-    def log_metrics(self, tb_writer, global_step: int, **kwargs):
+    def log_metrics(self, logger, global_step: int, **kwargs):
         """Log any metrics to the tb_logger"""
         pass
