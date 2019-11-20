@@ -83,14 +83,12 @@ if __name__ == '__main__':
         get_energy_trainer(setup_sm_digits),
         config={
             "lr": tune.loguniform(1e-4, 1e-1),
-            "num_epochs": tune.randint(10, 20),
-            "num_mc_steps": tune.randint(1, 20),
             "n_hidden": tune.randint(4, 48),
             "model": tune.choice(["conv", "resnet"])
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
-        num_samples=2,
-        checkpoint_freq=1,
+        num_samples=10,
+        checkpoint_freq=10,
         checkpoint_at_end=True,
     )
     print(analysis.get_best_config(metric="loss_ais", mode="min"))

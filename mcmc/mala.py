@@ -15,6 +15,7 @@ class MALASampler(MCSampler):
         if x.grad is not None:
             x.grad.data.zero_()
         y = net(x, beta=beta)
+        x.retain_grad()
         y.sum().backward()
         grad_x = x.grad
 

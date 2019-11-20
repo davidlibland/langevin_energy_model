@@ -49,15 +49,14 @@ class Logger:
         }
 
 
-def get_energy_trainer(setup_dist: Callable[[Any, ...], Tuple[core.Sampler, model.BaseEnergyModel]]):
+def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.BaseEnergyModel]]):
     """Returns a tune trainable for the distribution and model architecture"""
     class EnergyTrainer(Trainable):
         def _setup(self, config):
             self.lr = config.get("lr", 1e-2)
-            self.num_epochs = config.get("num_epochs", 100)
-            self.num_mc_steps = config.get("num_mc_steps", 10)
+            self.num_mc_steps = config.get("num_mc_steps", 1)
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
-            self.sample_beta = config.get("sample_beta", 0.1)
+            self.sample_beta = config.get("sample_beta", 1e1)
             self.batch_size = config.get("batch_size", 1024)
             self.verbose = True
 
@@ -95,7 +94,7 @@ def get_energy_trainer(setup_dist: Callable[[Any, ...], Tuple[core.Sampler, mode
                 label=self.global_step_
             fig = plt.figure()
             self.net_.eval()
-            samples = self.net_.sample_fantasy(x=None,
+            samples = self.net_.sample_fantasy(x=self.model_samples_[-1],
                                                num_mc_steps=self.num_sample_mc_steps,
                                                beta=self.sample_beta,
                                                mc_dynamics=self.sampler,
