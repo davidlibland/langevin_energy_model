@@ -58,10 +58,11 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
             self.sample_beta = config.get("sample_beta", 1e1)
             self.batch_size = config.get("batch_size", 1024)
+            self.sample_size = config.get("sample_size", 10000)
             self.verbose = True
 
             self.dist, self.net_ = setup_dist(**config)
-            samples = self.dist.rvs(10000)
+            samples = self.dist.rvs(self.sample_size)
             print(samples.shape)
             dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
             self.energy = lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
@@ -99,7 +100,7 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
                                                beta=self.sample_beta,
                                                mc_dynamics=self.sampler,
                                                num_samples=36
-                                               ).detach().cpu()
+                                               ).detach().cpu().numpy()
             self.dist.visualize(fig, samples, self.energy)
             plot_fn = os.path.join(dir, f"samples_{label}.png")
             fig.savefig(plot_fn)
@@ -192,8 +193,8 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
 
         def _save(self, tmp_checkpoint_dir):
             """Save the model"""
-            self.save_model(dir=tmp_checkpoint_dir)
             self.save_images(dir=tmp_checkpoint_dir)
+            self.save_model(dir=tmp_checkpoint_dir)
             return tmp_checkpoint_dir
 
         def _restore(self, checkpoint):
