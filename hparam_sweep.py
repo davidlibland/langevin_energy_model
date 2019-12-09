@@ -142,7 +142,7 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
                 # Get model samples, either from replay buffer or noise.
                 if self.model_samples_ is None:
                     self.model_samples_ = deque(
-                        [self.net_.sample_from_prior(data_sample.shape[0], device=self.device)])
+                        [self.net_.sample_from_prior(data_sample.shape[0], device=self.device).detach()])
                 elif len(self.model_samples_) > MAX_REPLAY:
                     self.model_samples_.popleft()
                 replay_sample = random.choices(
@@ -175,7 +175,7 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
 
                 batch_training_time = time.time() - batch_start_time
                 epoch_training_time += batch_training_time
-                objectives.append(objective)
+                objectives.append(float(objective))
 
                 tr_metrics_start_time = time.time()
                 for callback in self.step_callbacks:

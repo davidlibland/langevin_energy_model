@@ -185,6 +185,7 @@ class ResnetEnergyModel(BaseEnergyModel):
         x = torch.cat([ones, x], dim=1) # add a channel of 1s to distinguish padding.
         for layer in self.internal_layers[:-1]:
             x = layer(x)
+            # ToDo: Consider changing this to swish:
             x = F.leaky_relu(x)
         x = torch.sum(x, dim=[2, 3])  # spatial sum
         x = self.internal_layers[-1](x)

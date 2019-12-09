@@ -48,33 +48,33 @@ def setup_sm_digits_simple(**kwargs):
     return dist, net
 
 
-def setup_sm_digits(model="conv", n_hidden=12, **kwargs):
+def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
     dist = get_approx_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     if model == "resnet":
-        net = ResnetEnergyModel((1, 4, 4), 2, 2, n_hidden, prior_scale=5*scale)
+        net = ResnetEnergyModel((1, 4, 4), 2, 2, n_hidden, prior_scale=prior_scale_factor*scale)
     else:
-        net = ConvEnergyModel((1, 4, 4), 2, n_hidden, prior_scale=5*scale)
+        net = ConvEnergyModel((1, 4, 4), 2, n_hidden, prior_scale=prior_scale_factor*scale)
     return dist, net
 
 
-def setup_digits(model="conv", n_hidden=25, **kwargs):
+def setup_digits(model="conv", n_hidden=25, prior_scale_factor=5, **kwargs):
     dist = get_approx_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     if model == "resnet":
-        net = ResnetEnergyModel((1, 8, 8), 3, 2, n_hidden, prior_scale=5*scale)
+        net = ResnetEnergyModel((1, 8, 8), 3, 2, n_hidden, prior_scale=prior_scale_factor*scale)
     else:
-        net = ConvEnergyModel((1, 8, 8), 3, n_hidden, prior_scale=5*scale)
+        net = ConvEnergyModel((1, 8, 8), 3, n_hidden, prior_scale=prior_scale_factor*scale)
     return dist, net
 
 
-def setup_mnist(n_hidden=25, **kwargs):
+def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
     dist = get_approx_mnist_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    net = ResnetEnergyModel((1, 28, 28), 3, 2, n_hidden, prior_scale=scale)
+    net = ResnetEnergyModel((1, 28, 28), 3, 2, n_hidden, prior_scale=prior_scale_factor*scale)
     return dist, net
 
 

@@ -20,7 +20,7 @@ class MALASampler(MCSampler):
         grad_x = x.grad
 
         # Hack to keep gradients in control:
-        lr = self.lr/max(1, grad_x.abs().max())
+        lr = self.lr/max(1, float(grad_x.abs().max()))
 
         noise_scale = torch.sqrt(torch.as_tensor(lr*2))
         x_det = (x - lr*grad_x).detach()

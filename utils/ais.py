@@ -46,22 +46,22 @@ class AISLoss(CheckpointCallback):
         """Update the estimate of log_Z"""
         net.eval()
         current_samples = net.sample_from_prior(self.num_chains, device=self.device)
-        log_w = net(current_samples, beta=0)
+        log_w = net(current_samples, beta=0).detach()
         for beta in self.beta_schedule[1:-1]:
-            log_w -= net(current_samples, beta=beta)
+            log_w -= net(current_samples, beta=beta).detach()
             current_samples = net.sample_fantasy(current_samples,
                                                  num_mc_steps=self.num_mc_steps,
                                                  beta=beta,
                                                  mc_dynamics=self.mc_dynamics
-                                                 )
-            log_w += net(current_samples, beta=beta)
-        log_w -= net(current_samples, beta=self.beta_schedule[-1])
+                                                 ).detach()
+            log_w += net(current_samples, beta=beta).detach()
+        log_w -= net(current_samples, beta=self.beta_schedule[-1]).detach()
 
         # Store the weights:
         self._sample_state = AISState(
-            log_w0=log_w,
-            log_p0=-net(current_samples),
-            current_samples=current_samples,
+            log_w0=log_w.detach(),
+            log_p0=-net(current_samples).detach(),
+            current_samples=current_samples.detach(),
         )
 
     def __call__(self, net: BaseEnergyModel, data_sample, global_step, **kwargs):
@@ -83,12 +83,12 @@ class AISLoss(CheckpointCallback):
         # get the diagnostics
         log_w_var, effective_sample_size = self.get_diagnostic_stats(log_w)
         self.logger(loss_ais=loss,
-                    ais_log_w_var=float(log_w_var.cpu()),
+                    ais_log_w_var=log_w_var,
                     ais_effective_sample_size=effective_sample_size
                     )
 
     @staticmethod
-    def get_diagnostic_stats(log_w) -> Tuple:
+    def get_diagnostic_stats(log_w) -> Tuple[float, float]:
         """
         Returns diagnostic stats for a set of log weights.
 
@@ -107,7 +107,7 @@ class AISLoss(CheckpointCallback):
             effective_sample_size = 0
         else:
             effective_sample_size = float(num_chains / exp_std.cpu())
-        return log_w_var, effective_sample_size
+        return float(log_w_var), effective_sample_size
 
     @staticmethod
     def build_schedule(*instructions: Tuple[str, float, int]) -> np.ndarray:
