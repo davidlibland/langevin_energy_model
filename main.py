@@ -3,10 +3,10 @@ from ray.tune.schedulers import ASHAScheduler
 from ray import tune
 
 from distributions.core import Distribution, Normal
-from distributions.mnist import get_approx_mnist_distribution
+from distributions.mnist import get_mnist_distribution
 from distributions.digits import get_approx_digit_distribution
-from distributions.small_digits import get_approx_sm_digit_distribution
-from distributions.small_patterns import get_approx_pattern_distribution
+from distributions.small_digits import get_sm_digit_distribution
+from distributions.small_patterns import get_pattern_distribution
 from hparam_sweep import get_energy_trainer
 from model import ConvEnergyModel
 from model import SimpleEnergyModel, ResnetEnergyModel
@@ -33,7 +33,7 @@ def setup_2d(**kwargs):
 
 
 def setup_patterns(patterns=("checkerboard_2x2", "diagonal_gradient_2x2"), **kwargs):
-    dist = get_approx_pattern_distribution(patterns)
+    dist = get_pattern_distribution(patterns)
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     net = ResnetEnergyModel((1, 2, 2), 2, 3, 12, prior_scale=5*scale)
@@ -41,7 +41,7 @@ def setup_patterns(patterns=("checkerboard_2x2", "diagonal_gradient_2x2"), **kwa
 
 
 def setup_sm_digits_simple(**kwargs):
-    dist = get_approx_sm_digit_distribution()
+    dist = get_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     net = SimpleEnergyModel(16, 3, 60, prior_scale=5*scale)
@@ -49,7 +49,7 @@ def setup_sm_digits_simple(**kwargs):
 
 
 def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
-    dist = get_approx_sm_digit_distribution()
+    dist = get_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     if model == "resnet":
@@ -71,7 +71,7 @@ def setup_digits(model="conv", n_hidden=25, prior_scale_factor=5, **kwargs):
 
 
 def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
-    dist = get_approx_mnist_distribution()
+    dist = get_mnist_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     net = ResnetEnergyModel((1, 28, 28), 3, 2, n_hidden, prior_scale=prior_scale_factor*scale)
