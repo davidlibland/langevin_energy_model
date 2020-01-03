@@ -19,7 +19,7 @@ class BasicBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride=1, norm_layer="batch_norm", activation=None, spectral_norm=False):
         super(BasicBlock, self).__init__()
-        if norm_layer is "batch_norm":
+        if norm_layer == "batch_norm":
             norm_layer = nn.BatchNorm2d
         if norm_layer is None:
             norm_layer = Identity
