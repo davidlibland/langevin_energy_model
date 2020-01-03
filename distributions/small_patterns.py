@@ -13,7 +13,7 @@ PATTERNS = {
 }
 
 @lru_cache()
-def get_approx_pattern_distribution(patterns: Tuple[str,...]=("checkerboard",)) -> "Sampler":
+def get_pattern_distribution(patterns: Tuple[str, ...]=("checkerboard",)) -> "Sampler":
     """
     Returns a pattern sampler.
 

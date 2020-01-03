@@ -10,7 +10,6 @@ import torch.utils.data as data
 from model import BaseEnergyModel
 
 # Globals
-from utils.logging import tb_writer
 
 MAX_REPLAY = 30
 REPLAY_PROB = .99
@@ -23,10 +22,9 @@ class CheckpointCallback:
 
 def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
           batch_size=1000, optimizer=None, num_mc_steps=20, verbose=True,
-          ckpt_callbacks: List[CheckpointCallback]=None):
-    if ckpt_callbacks is None:
-        ckpt_callbacks = []
-    ckpt_callbacks.append(net.sampler.log_metrics(tb_writer))
+          step_callbacks: List[CheckpointCallback]=None):
+    if step_callbacks is None:
+        step_callbacks = []
     if optimizer is None:
         optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-3)
     dataloader = data.DataLoader(
@@ -87,10 +85,9 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
             batch_training_time = time.time() - batch_start_time
             epoch_training_time += batch_training_time
             objectives.append(objective)
-            tb_writer.add_scalar(tag="loss/objective", scalar_value=objective, global_step=global_step)
 
             tr_metrics_start_time = time.time()
-            for callback in ckpt_callbacks:
+            for callback in step_callbacks:
                 callback(net=net, data_sample=data_sample,
                          model_sample=model_sample, epoch=epoch,
                          global_step=global_step, validation=False)
@@ -101,7 +98,7 @@ def train(net: BaseEnergyModel, dataset: data.Dataset, num_epochs=10, lr=1e-2,
                 print(f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s")
 
         valid_metrics_start_time = time.time()
-        for callback in ckpt_callbacks:
+        for callback in step_callbacks:
             callback(net=net, data_sample=data_sample,
                      model_sample=model_sample, epoch=epoch,
                      global_step=global_step, validation=True)

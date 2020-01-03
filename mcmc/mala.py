@@ -15,11 +15,12 @@ class MALASampler(MCSampler):
         if x.grad is not None:
             x.grad.data.zero_()
         y = net(x, beta=beta)
+        x.retain_grad()
         y.sum().backward()
         grad_x = x.grad
 
         # Hack to keep gradients in control:
-        lr = self.lr/max(1, grad_x.abs().max())
+        lr = self.lr/max(1, float(grad_x.abs().max()))
 
         noise_scale = torch.sqrt(torch.as_tensor(lr*2))
         x_det = (x - lr*grad_x).detach()
@@ -63,7 +64,7 @@ class MALASampler(MCSampler):
         return -eps/(4*lr)
 
     @curry
-    def log_metrics(self, tb_writer, global_step: int, **kwargs):
+    def log_metrics(self, logger, global_step: int, **kwargs):
         """Log any metrics to the tb_logger"""
-        tb_writer.add_scalar("mala/lr", scalar_value=self.lr, global_step=global_step)
-        tb_writer.add_scalar("mala/acceptance_ratio", scalar_value=self.acceptance_ratio, global_step=global_step)
+        logger(mala_lr=self.lr)
+        logger(mala_acceptance_ratio=self.acceptance_ratio)

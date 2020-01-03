@@ -10,7 +10,7 @@ from distributions.utils import train_gmm_pca_model, plot_image_samples, \
 
 
 @lru_cache()
-def get_mnist_distribution() -> Sampler:
+def get_sm_digit_distribution() -> Sampler:
     """
     Returns a Digits Sampler.
 
@@ -19,8 +19,11 @@ def get_mnist_distribution() -> Sampler:
     """
     X, y = load_digits(return_X_y=True)
     X = X.astype(np.float)/X.max()
+    n = X.shape[0]
+    X_torch = torch.tensor(X.reshape([n, 8, 8]))
+    X = torch.nn.AvgPool2d(kernel_size=(2, 2))(X_torch).numpy()
     digit_dist = Sampler.from_samples(X)
-    digit_dist.visualize = plot_image_samples([8, 8], False)
+    digit_dist.visualize = plot_image_samples([4, 4], False)
     return digit_dist
 
 @lru_cache()
