@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import scipy.special as scisp
 
+import utils.beta_schedules
 from mcmc.langevin import LangevinSampler
 from mcmc.mala import MALASampler
 from model import BaseEnergyModel
@@ -52,16 +53,16 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=.1):
     print(mc_loss)
 
     logger = MockLogger()
-    beta_schedule = AISLoss.build_schedule(
+    beta_schedule = utils.beta_schedules.build_schedule(
         ("arith", .01, 200),
         ("geom", 1., 1000)
     )
     ais_loss_obj = AISLoss(logger=logger, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=MALASampler(lr=lr))
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
-    print(logger.logs["ais_loss"])
+    print(logger.logs["loss_ais"])
 
     ais_loss_obj = AISLoss(logger=logger, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=LangevinSampler(lr=lr))
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
-    print(logger.logs["ais_loss"])
+    print(logger.logs["loss_ais"])

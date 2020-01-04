@@ -3,6 +3,10 @@ from toolz import curry
 
 from mcmc.abstract import MCSampler
 
+UPPER_ACCEPTANCE_BOUND = .7
+LOWER_ACCEPTANCE_BOUND = .4
+LR_ADJUSTMENT = 1.0001
+
 
 class MALASampler(MCSampler):
     def __init__(self, lr):
@@ -44,10 +48,10 @@ class MALASampler(MCSampler):
         mask = torch.rand(x.shape[0], 1, device=alpha.device) < alpha
         # adjust the learning rate based on the acceptance ratio:
         acceptance_ratio = torch.mean(mask.float()).float()
-        if acceptance_ratio.float() < .4:
-            self.lr /= 1.1
-        elif acceptance_ratio.float() > .7:
-            self.lr *= 1.1
+        if acceptance_ratio.float() < LOWER_ACCEPTANCE_BOUND:
+            self.lr /= LR_ADJUSTMENT
+        elif acceptance_ratio.float() > UPPER_ACCEPTANCE_BOUND:
+            self.lr *= LR_ADJUSTMENT
         self.acceptance_ratio = float(0.1*acceptance_ratio+.9*self.acceptance_ratio)
         return torch.where(mask, x_, x).detach()
 
