@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 import torch.utils.data as data
 from torch import optim
 
-from mcmc.mala import MALASampler
+import mcmc.mala
+import mcmc.langevin
+import mcmc.simulated_tempering
 from distributions import core
 from utils.ais import AISLoss
 import model
@@ -59,6 +61,12 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             self.sample_beta = config.get("sample_beta", 1e1)
             self.batch_size = config.get("batch_size", 1024)
             self.sample_size = config.get("sample_size", 10000)
+            samplers = {
+                "mala": mcmc.mala.MALASampler(lr=0.1),
+                "langevin": mcmc.langevin.LangevinSampler(lr=0.1),
+                "tempered mala": mcmc.simulated_tempering.SimulatedTempering(mc_dynamics=mcmc.mala.MALASampler(lr=0.1)),
+            }
+            self.sampler = samplers.get(config.get("sampler", "mala"))
             self.verbose = True
 
             self.dist, self.net_ = setup_dist(**config)
@@ -68,8 +76,6 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             self.energy = lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
 
             self.optimizer_ = optim.Adam(self.net_.parameters(), lr=self.lr, weight_decay=1e-1)
-
-            self.sampler = MALASampler(lr=0.1)
 
             self.dataloader = data.DataLoader(
                 dataset=dataset,
@@ -160,8 +166,11 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
                                            noise_sample)
 
                 self.net_.eval()
-                model_sample = self.net_.sample_fantasy(model_sample,
-                                                        num_mc_steps=self.num_mc_steps).detach()
+                model_sample = self.net_.sample_fantasy(
+                    model_sample,
+                    num_mc_steps=self.num_mc_steps,
+                    mc_dynamics=self.sampler,
+                ).detach()
 
                 self.model_samples_.append(model_sample)
 
