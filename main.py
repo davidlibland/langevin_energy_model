@@ -4,7 +4,7 @@ from ray import tune
 
 from distributions.core import Distribution, Normal
 from distributions.mnist import get_mnist_distribution
-from distributions.digits import get_approx_digit_distribution
+from distributions.digits import get_digit_distribution
 from distributions.small_digits import get_sm_digit_distribution
 from distributions.small_patterns import get_pattern_distribution
 from hparam_sweep import get_energy_trainer
@@ -60,7 +60,7 @@ def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
 
 
 def setup_digits(model="conv", n_hidden=25, prior_scale_factor=5, **kwargs):
-    dist = get_approx_digit_distribution()
+    dist = get_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n)**2).sum()/n)
     if model == "resnet":
@@ -82,13 +82,21 @@ if __name__ == '__main__':
     analysis = tune.run(
         get_energy_trainer(setup_sm_digits),
         config={
-            "lr": tune.loguniform(1e-4, 1e-1),
-            "n_hidden": tune.randint(4, 48),
-            "model": tune.choice(["conv", "resnet"])
+            "lr": tune.loguniform(1e-5, 1e-1),
+            "n_hidden": tune.randint(4, 512),
+            "model": tune.choice(["conv", "resnet"]),
+            "batch_size": tune.randint(128, 1024),
+            "prior_scale_factor": tune.loguniform(1e-1, 1e2)
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
-        num_samples=10,
+        num_samples=2,
         checkpoint_freq=10,
         checkpoint_at_end=True,
+        resources_per_trial={
+             "gpu": 1,
+         }
     )
+    df = analysis.dataframe()
+    save_filename = input("Where to save the csv?")
+    df.to_csv(save_filename)
     print(analysis.get_best_config(metric="loss_ais", mode="min"))

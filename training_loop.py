@@ -11,7 +11,7 @@ from model import BaseEnergyModel
 
 # Globals
 
-MAX_REPLAY = 30
+MAX_REPLAY = 200
 REPLAY_PROB = .99
 
 
