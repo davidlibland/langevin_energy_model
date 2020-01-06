@@ -6,7 +6,7 @@ import typing
 import numpy as np
 
 
-def build_schedule(*instructions: typing.Tuple[str, float, int]) -> np.ndarray:
+def build_schedule(*instructions: typing.Tuple[str, float, int], start=0.) -> np.ndarray:
     """
     Parses instructions of the form:
         ("geom", 0.1, 5), ("arith", 0.5, 10), ..., ("geom", 1, 6)
@@ -26,12 +26,12 @@ def build_schedule(*instructions: typing.Tuple[str, float, int]) -> np.ndarray:
 
     Args:
         instructions: The instructions used to build the schedule.
+        start: An optional starting point, defaults to zero.
 
     Returns:
         np.ndarray (the schedule).
     """
     sequence = []
-    start = 0.
     stop = 0
     for seq_type, stop, num in instructions:
         assert 0 < stop <= 1, f"Invalid input: {seq_type, stop, num} " \

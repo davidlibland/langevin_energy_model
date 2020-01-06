@@ -84,10 +84,11 @@ if __name__ == '__main__':
         config={
             "lr": tune.loguniform(1e-4, 1e-1),
             "n_hidden": tune.randint(4, 48),
-            "model": tune.choice(["conv", "resnet"])
+            "model": tune.choice(["conv", "resnet"]),
+            "sampler": tune.choice(["mala", "langevin", "tempered mala"])
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
-        num_samples=10,
+        num_samples=30,
         checkpoint_freq=10,
         checkpoint_at_end=True,
     )
