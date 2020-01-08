@@ -48,11 +48,6 @@ class MixtureNormalNet(model.BaseEnergyModel):
         return -torch.logsumexp(-torch.stack(energies, dim=1), dim=1)
 
 
-constant_beta_schedule = utils.beta_schedules.build_schedule(
-    ("geom", 1.0, 30), start=1.0
-)
-
-
 @pytest.mark.parametrize(
     "name, fsampler, num_steps",
     [
@@ -61,16 +56,14 @@ constant_beta_schedule = utils.beta_schedules.build_schedule(
         (
             "tempered langevin",
             lambda: mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=mcmc.langevin.LangevinSampler(lr=0.5),
-                beta_schedule=constant_beta_schedule,
+                mc_dynamics=mcmc.langevin.LangevinSampler(lr=0.5)
             ),
             10,
         ),
         (
             "tempered mala",
             lambda: mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=mcmc.mala.MALASampler(lr=0.5),
-                beta_schedule=constant_beta_schedule,
+                mc_dynamics=mcmc.mala.MALASampler(lr=0.5)
             ),
             10,
         ),

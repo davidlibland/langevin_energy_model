@@ -15,6 +15,7 @@ from torch import optim
 import mcmc.mala
 import mcmc.langevin
 import mcmc.tempered_transitions
+import utils.beta_schedules
 from distributions import core
 from utils.ais import AISLoss
 import model
@@ -62,11 +63,20 @@ def get_energy_trainer(
             self.sample_beta = config.get("sample_beta", 1e1)
             self.batch_size = config.get("batch_size", 1024)
             self.sample_size = config.get("sample_size", 10000)
+            sampler_lr = config.get("sampler_lr", 0.1)
+            sampler_beta_schedule = utils.beta_schedules.build_schedule(
+                ("geom", 1.0, 30), start=config.get("sampler_beta_schedule_start", 0.1)
+            )
             samplers = {
-                "mala": mcmc.mala.MALASampler(lr=0.1),
-                "langevin": mcmc.langevin.LangevinSampler(lr=0.1),
+                "mala": mcmc.mala.MALASampler(lr=sampler_lr),
+                "langevin": mcmc.langevin.LangevinSampler(lr=sampler_lr),
+                "tempered langevin": mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=mcmc.langevin.LangevinSampler(lr=sampler_lr),
+                    beta_schedule=sampler_beta_schedule
+                ),
                 "tempered mala": mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=mcmc.mala.MALASampler(lr=0.1)
+                    mc_dynamics=mcmc.mala.MALASampler(lr=sampler_lr),
+                    beta_schedule=sampler_beta_schedule
                 ),
             }
             self.sampler = samplers.get(config.get("sampler", "mala"))

@@ -84,21 +84,30 @@ def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
     return dist, net
 
 
+def stop_on_low_ais_ess(trial_id, result):
+    """Stops trials if the effective sample size falls too low."""
+    return result["ais_effective_sample_size"] < 1
+
+
 if __name__ == "__main__":
     analysis = tune.run(
         get_energy_trainer(setup_sm_digits),
+        name="small_digits",
         config={
             "lr": tune.loguniform(1e-4, 1e-1),
             "n_hidden": tune.randint(4, 48),
             "model": tune.choice(["conv", "resnet"]),
             "batch_size": tune.randint(128, 1024),
             "prior_scale_factor": tune.loguniform(1e-1, 1e2),
-            "sampler": tune.choice(["mala", "langevin", "tempered mala"]),
+            "sampler": tune.choice(["tempered langevin", "tempered mala"]),
+            "sampler_beta_schedule_start": tune.loguniform(1e-1, 0.6),
+            "sampler_lr": tune.loguniform(0.03, 1.0),
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
         num_samples=30,
         checkpoint_freq=10,
         checkpoint_at_end=True,
+        stop=stop_on_low_ais_ess,
         resources_per_trial={"gpu": 1},
     )
     df = analysis.dataframe()
