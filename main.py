@@ -13,21 +13,17 @@ from model import SimpleEnergyModel, ResnetEnergyModel
 
 
 def setup_1d(**kwargs):
-    dist = Distribution.mixture([
-        Normal(np.array([-3])),
-        Normal(np.array([3])),
-        Normal(np.array([15])),
-    ])
+    dist = Distribution.mixture(
+        [Normal(np.array([-3])), Normal(np.array([3])), Normal(np.array([15]))]
+    )
     net = SimpleEnergyModel(1, 3, 25)
     return dist, net
 
 
 def setup_2d(**kwargs):
-    dist = Distribution.mixture([
-        Normal(np.array([-3, 2])),
-        Normal(np.array([3, 5])),
-        Normal(np.array([15, 1])),
-    ])
+    dist = Distribution.mixture(
+        [Normal(np.array([-3, 2])), Normal(np.array([3, 5])), Normal(np.array([15, 1]))]
+    )
     net = SimpleEnergyModel(2, 3, 25)
     return dist, net
 
@@ -35,50 +31,60 @@ def setup_2d(**kwargs):
 def setup_patterns(patterns=("checkerboard_2x2", "diagonal_gradient_2x2"), **kwargs):
     dist = get_pattern_distribution(patterns)
     n = 1000
-    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    net = ResnetEnergyModel((1, 2, 2), 2, 3, 12, prior_scale=5*scale)
+    scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
+    net = ResnetEnergyModel((1, 2, 2), 2, 3, 12, prior_scale=5 * scale)
     return dist, net
 
 
 def setup_sm_digits_simple(**kwargs):
     dist = get_sm_digit_distribution()
     n = 1000
-    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    net = SimpleEnergyModel(16, 3, 60, prior_scale=5*scale)
+    scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
+    net = SimpleEnergyModel(16, 3, 60, prior_scale=5 * scale)
     return dist, net
 
 
 def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
     dist = get_sm_digit_distribution()
     n = 1000
-    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
     if model == "resnet":
-        net = ResnetEnergyModel((1, 4, 4), 2, 2, n_hidden, prior_scale=prior_scale_factor*scale)
+        net = ResnetEnergyModel(
+            (1, 4, 4), 2, 2, n_hidden, prior_scale=prior_scale_factor * scale
+        )
     else:
-        net = ConvEnergyModel((1, 4, 4), 2, n_hidden, prior_scale=prior_scale_factor*scale)
+        net = ConvEnergyModel(
+            (1, 4, 4), 2, n_hidden, prior_scale=prior_scale_factor * scale
+        )
     return dist, net
 
 
 def setup_digits(model="conv", n_hidden=25, prior_scale_factor=5, **kwargs):
     dist = get_digit_distribution()
     n = 1000
-    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
+    scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
     if model == "resnet":
-        net = ResnetEnergyModel((1, 8, 8), 3, 2, n_hidden, prior_scale=prior_scale_factor*scale)
+        net = ResnetEnergyModel(
+            (1, 8, 8), 3, 2, n_hidden, prior_scale=prior_scale_factor * scale
+        )
     else:
-        net = ConvEnergyModel((1, 8, 8), 3, n_hidden, prior_scale=prior_scale_factor*scale)
+        net = ConvEnergyModel(
+            (1, 8, 8), 3, n_hidden, prior_scale=prior_scale_factor * scale
+        )
     return dist, net
 
 
 def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
     dist = get_mnist_distribution()
     n = 1000
-    scale = np.sqrt((dist.rvs(n)**2).sum()/n)
-    net = ResnetEnergyModel((1, 28, 28), 3, 2, n_hidden, prior_scale=prior_scale_factor*scale)
+    scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
+    net = ResnetEnergyModel(
+        (1, 28, 28), 3, 2, n_hidden, prior_scale=prior_scale_factor * scale
+    )
     return dist, net
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     analysis = tune.run(
         get_energy_trainer(setup_sm_digits),
         config={
@@ -87,15 +93,13 @@ if __name__ == '__main__':
             "model": tune.choice(["conv", "resnet"]),
             "batch_size": tune.randint(128, 1024),
             "prior_scale_factor": tune.loguniform(1e-1, 1e2),
-            "sampler": tune.choice(["mala", "langevin", "tempered mala"])
+            "sampler": tune.choice(["mala", "langevin", "tempered mala"]),
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
         num_samples=30,
         checkpoint_freq=10,
         checkpoint_at_end=True,
-        resources_per_trial={
-             "gpu": 1,
-         }
+        resources_per_trial={"gpu": 1},
     )
     df = analysis.dataframe()
     save_filename = input("Where to save the csv?")

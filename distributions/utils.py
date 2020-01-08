@@ -8,8 +8,9 @@ from sklearn.mixture import GaussianMixture
 from toolz import curry
 
 
-def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
-                        covariance_type="spherical") -> "Distribution":
+def train_gmm_pca_model(
+    X, n_pca_comp=10, n_mixtures=5, covariance_type="spherical"
+) -> "Distribution":
     """
     Returns a GMM approximating the leading components of X.
 
@@ -22,6 +23,7 @@ def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
         Distribution modeling the leading PCA components of X.
     """
     from distributions.core import Normal, ApplyTransform
+
     dec = PCA(n_components=n_pca_comp, whiten=True)
     clf = GaussianMixture(n_components=n_mixtures, covariance_type=covariance_type)
     dec.fit(X)
@@ -37,25 +39,26 @@ def train_gmm_pca_model(X, n_pca_comp=10, n_mixtures=5,
         return tr_arr
 
     dist = Normal.from_sklearn_gmm(clf)
-    trans_dist = ApplyTransform(dist=dist,
-                                trans=trans,
-                                inv_trans=inv_trans)
+    trans_dist = ApplyTransform(dist=dist, trans=trans, inv_trans=inv_trans)
     return trans_dist
 
 
 @curry
-def plot_image_samples(im_size: Tuple[int, ...], binarize, fig: plt.Figure, X: np.ndarray, energy=None):
+def plot_image_samples(
+    im_size: Tuple[int, ...], binarize, fig: plt.Figure, X: np.ndarray, energy=None
+):
     """Plots model samples on the given figure."""
     fig.clear()
     if binarize:
-        X = X > .5
+        X = X > 0.5
     n = min(int(sqrt(X.shape[0])), 7)
 
     ax = fig.subplots(ncols=n, nrows=n)
     for i in range(n):
         for j in range(n):
-            ax[i, j].imshow(X[i+n*j, :].reshape(im_size),
-                           cmap='gray', vmin=0, vmax=1)
+            ax[i, j].imshow(
+                X[i + n * j, :].reshape(im_size), cmap="gray", vmin=0, vmax=1
+            )
             ax[i, j].axis("off")
 
 

@@ -9,11 +9,14 @@ from .core import Sampler
 
 PATTERNS = {
     "checkerboard_2x2": np.array([[0, 1], [1, 0]], dtype=np.float32),
-    "diagonal_gradient_2x2": np.array([[0, .5], [.5, 1]], dtype=np.float32)
+    "diagonal_gradient_2x2": np.array([[0, 0.5], [0.5, 1]], dtype=np.float32),
 }
 
+
 @lru_cache()
-def get_pattern_distribution(patterns: Tuple[str, ...]=("checkerboard",)) -> "Sampler":
+def get_pattern_distribution(
+    patterns: Tuple[str, ...] = ("checkerboard",)
+) -> "Sampler":
     """
     Returns a pattern sampler.
 

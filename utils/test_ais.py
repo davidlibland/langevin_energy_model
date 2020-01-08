@@ -18,16 +18,23 @@ class DiagonalNormalModel(BaseEnergyModel):
         self.log_scale = nn.Parameter(torch.randn(1, num_features))
 
     def energy(self, x):
-        log_z = (0.5*np.log(2*np.pi)+self.log_scale).sum()
-        result = (0.5*((x - self.mean)/torch.exp(self.log_scale))**2).sum(dim=1, keepdim=True)+log_z
+        log_z = (0.5 * np.log(2 * np.pi) + self.log_scale).sum()
+        result = (0.5 * ((x - self.mean) / torch.exp(self.log_scale)) ** 2).sum(
+            dim=1, keepdim=True
+        ) + log_z
         return result
 
     def loss(self, x):
-        denom = torch.exp(2*self.log_scale)+self.prior_scale**2
-        full_mean = self.mean*self.prior_scale**2/denom
-        log_full_scale = self.log_scale + np.log(self.prior_scale) - 0.5*torch.log(denom)
-        log_z = (0.5*np.log(2*np.pi)+log_full_scale).sum()
-        return (0.5*(((x - full_mean)/torch.exp(log_full_scale)).sum(dim=1))**2+log_z).mean()
+        denom = torch.exp(2 * self.log_scale) + self.prior_scale ** 2
+        full_mean = self.mean * self.prior_scale ** 2 / denom
+        log_full_scale = (
+            self.log_scale + np.log(self.prior_scale) - 0.5 * torch.log(denom)
+        )
+        log_z = (0.5 * np.log(2 * np.pi) + log_full_scale).sum()
+        return (
+            0.5 * (((x - full_mean) / torch.exp(log_full_scale)).sum(dim=1)) ** 2
+            + log_z
+        ).mean()
 
 
 class MockLogger:
@@ -41,28 +48,41 @@ class MockLogger:
             self.logs[k].append(v)
 
 
-def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=.1):
+def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
     net = DiagonalNormalModel(num_features=num_features)
     X = torch.randn(num_samples, num_features)
     N = num_chains
     Y = torch.randn(N, num_features)
-    Y_p = N*torch.exp(-(Y**2).sum(dim=1, keepdim=True)/2)/(np.sqrt(2*np.pi)**num_features)
+    Y_p = (
+        N
+        * torch.exp(-(Y ** 2).sum(dim=1, keepdim=True) / 2)
+        / (np.sqrt(2 * np.pi) ** num_features)
+    )
     exact_loss = net.loss(X)
-    mc_loss = net(X).mean() + (scisp.logsumexp(-net(Y).detach(), b=1/Y_p))
+    mc_loss = net(X).mean() + (scisp.logsumexp(-net(Y).detach(), b=1 / Y_p))
     print(exact_loss)
     print(mc_loss)
 
     logger = MockLogger()
     beta_schedule = utils.beta_schedules.build_schedule(
-        ("arith", .01, 200),
-        ("geom", 1., 1000)
+        ("arith", 0.01, 200), ("geom", 1.0, 1000)
     )
-    ais_loss_obj = AISLoss(logger=logger, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=MALASampler(lr=lr))
+    ais_loss_obj = AISLoss(
+        logger=logger,
+        beta_schedule=beta_schedule,
+        num_chains=N,
+        mc_dynamics=MALASampler(lr=lr),
+    )
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(logger.logs["loss_ais"])
 
-    ais_loss_obj = AISLoss(logger=logger, beta_schedule=beta_schedule, num_chains=N, mc_dynamics=LangevinSampler(lr=lr))
+    ais_loss_obj = AISLoss(
+        logger=logger,
+        beta_schedule=beta_schedule,
+        num_chains=N,
+        mc_dynamics=LangevinSampler(lr=lr),
+    )
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(logger.logs["loss_ais"])

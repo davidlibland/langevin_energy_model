@@ -22,13 +22,14 @@ import model
 # Globals (make these configurable)
 
 MAX_REPLAY = 30
-REPLAY_PROB = .99
+REPLAY_PROB = 0.99
 
 
 class Logger:
     """
     A simple container for logging a variety of metrics.
     """
+
     def __init__(self):
         self.logs = dict()
 
@@ -45,14 +46,14 @@ class Logger:
 
     def means(self):
         """Returns the means of the metrics"""
-        return {
-            k: 0 if not vs else sum(vs)/len(vs)
-            for k, vs in self.logs.items()
-        }
+        return {k: 0 if not vs else sum(vs) / len(vs) for k, vs in self.logs.items()}
 
 
-def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.BaseEnergyModel]]):
+def get_energy_trainer(
+    setup_dist: Callable[[Any], Tuple[core.Sampler, model.BaseEnergyModel]]
+):
     """Returns a tune trainable for the distribution and model architecture"""
+
     class EnergyTrainer(Trainable):
         def _setup(self, config):
             self.lr = config.get("lr", 1e-2)
@@ -64,7 +65,9 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             samplers = {
                 "mala": mcmc.mala.MALASampler(lr=0.1),
                 "langevin": mcmc.langevin.LangevinSampler(lr=0.1),
-                "tempered mala": mcmc.tempered_transitions.SimulatedTempering(mc_dynamics=mcmc.mala.MALASampler(lr=0.1)),
+                "tempered mala": mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=mcmc.mala.MALASampler(lr=0.1)
+                ),
             }
             self.sampler = samplers.get(config.get("sampler", "mala"))
             self.verbose = True
@@ -73,15 +76,19 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             samples = self.dist.rvs(self.sample_size)
             print(samples.shape)
             dataset = data.TensorDataset(torch.tensor(samples, dtype=torch.float))
-            self.energy = lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
+            self.energy = (
+                lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
+            )
 
-            self.optimizer_ = optim.Adam(self.net_.parameters(), lr=self.lr, weight_decay=1e-1)
+            self.optimizer_ = optim.Adam(
+                self.net_.parameters(), lr=self.lr, weight_decay=1e-1
+            )
 
             self.dataloader = data.DataLoader(
                 dataset=dataset,
                 batch_size=self.batch_size,
                 drop_last=True,
-                shuffle=True
+                shuffle=True,
             )
             # Determine the device type:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -98,15 +105,21 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
         def save_images(self, label=None, dir=""):
             """Saves sample images at the giving dir"""
             if label is None:
-                label=self.global_step_
+                label = self.global_step_
             fig = plt.figure()
             self.net_.eval()
-            samples = self.net_.sample_fantasy(x=self.model_samples_[-1],
-                                               num_mc_steps=self.num_sample_mc_steps,
-                                               beta=self.sample_beta,
-                                               mc_dynamics=self.sampler,
-                                               num_samples=36
-                                               ).detach().cpu().numpy()
+            samples = (
+                self.net_.sample_fantasy(
+                    x=self.model_samples_[-1],
+                    num_mc_steps=self.num_sample_mc_steps,
+                    beta=self.sample_beta,
+                    mc_dynamics=self.sampler,
+                    num_samples=36,
+                )
+                .detach()
+                .cpu()
+                .numpy()
+            )
             self.dist.visualize(fig, samples, self.energy)
             plot_fn = os.path.join(dir, f"samples_{label}.png")
             fig.savefig(plot_fn)
@@ -115,13 +128,15 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
         def save_model(self, dir="", **kwargs):
             """Saves the model at the given dir"""
             ckpt_fn = os.path.join(dir, f"model.pkl")
-            torch.save({
+            torch.save(
+                {
                     "global_step": self.global_step_,
                     "epoch": self.epoch_,
                     "model": self.net_.state_dict(),
                     "optimizer": self.optimizer_.state_dict(),
-                    "model_samples": list(self.model_samples_)
-                }, ckpt_fn
+                    "model_samples": list(self.model_samples_),
+                },
+                ckpt_fn,
             )
 
         def load_model(self, dir=""):
@@ -148,22 +163,29 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
                 # Get model samples, either from replay buffer or noise.
                 if self.model_samples_ is None:
                     self.model_samples_ = deque(
-                        [self.net_.sample_from_prior(data_sample.shape[0], device=self.device).detach()])
+                        [
+                            self.net_.sample_from_prior(
+                                data_sample.shape[0], device=self.device
+                            ).detach()
+                        ]
+                    )
                 elif len(self.model_samples_) > MAX_REPLAY:
                     self.model_samples_.popleft()
                 replay_sample = random.choices(
                     self.model_samples_,
                     # favor more recent samples:
-                    weights=list(range(1, len(self.model_samples_) + 1))
+                    weights=list(range(1, len(self.model_samples_) + 1)),
                 )[0]
-                noise_sample = self.net_.sample_from_prior(replay_sample.shape[0],
-                                                           device=self.device)
+                noise_sample = self.net_.sample_from_prior(
+                    replay_sample.shape[0], device=self.device
+                )
                 mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
                 while len(mask.shape) < len(replay_sample.shape):
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
-                model_sample = torch.where(mask.to(self.device), replay_sample,
-                                           noise_sample)
+                model_sample = torch.where(
+                    mask.to(self.device), replay_sample, noise_sample
+                )
 
                 self.net_.eval()
                 model_sample = self.net_.sample_fantasy(
@@ -177,7 +199,9 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
                 # Forward gradient:
                 self.net_.train()
                 self.net_.zero_grad()
-                objective = self.net_(data_sample).mean() - self.net_(model_sample).mean()
+                objective = (
+                    self.net_(data_sample).mean() - self.net_(model_sample).mean()
+                )
                 objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_value_(self.net_.parameters(), 1e2)
                 self.optimizer_.step()
@@ -188,14 +212,23 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
 
                 tr_metrics_start_time = time.time()
                 for callback in self.step_callbacks:
-                    callback(net=self.net_, data_sample=data_sample,
-                             model_sample=model_sample, epoch=self.epoch_,
-                             global_step=self.global_step_, validation=False)
+                    callback(
+                        net=self.net_,
+                        data_sample=data_sample,
+                        model_sample=model_sample,
+                        epoch=self.epoch_,
+                        global_step=self.global_step_,
+                        validation=False,
+                    )
                 tr_metrics_time = time.time() - tr_metrics_start_time
                 epoch_metrics_time += tr_metrics_time
                 if self.verbose:
-                    print(f"on epoch {self.epoch_}, batch {i_batch}, objective: {objective}")
-                    print(f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s")
+                    print(
+                        f"on epoch {self.epoch_}, batch {i_batch}, objective: {objective}"
+                    )
+                    print(
+                        f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s"
+                    )
             means = self.logger_.means()
             self.logger_.flush()
             return means
@@ -209,4 +242,5 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
         def _restore(self, checkpoint):
             """Restore the model"""
             self.load_model(checkpoint)
+
     return EnergyTrainer

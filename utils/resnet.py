@@ -4,8 +4,16 @@ import torch.nn as nn
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=dilation,
+        groups=groups,
+        bias=False,
+        dilation=dilation,
+    )
 
 
 def conv1x1(in_planes, out_planes, stride=1):
@@ -15,9 +23,17 @@ def conv1x1(in_planes, out_planes, stride=1):
 
 class BasicBlock(nn.Module):
     expansion = 1
-    __constants__ = ['downsample']
+    __constants__ = ["downsample"]
 
-    def __init__(self, in_channels, out_channels, stride=1, norm_layer="batch_norm", activation=None, spectral_norm=False):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        stride=1,
+        norm_layer="batch_norm",
+        activation=None,
+        spectral_norm=False,
+    ):
         super(BasicBlock, self).__init__()
         if norm_layer == "batch_norm":
             norm_layer = nn.BatchNorm2d
@@ -66,11 +82,14 @@ class BasicBlock(nn.Module):
 class Identity(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
+
     def forward(self, x):
         return x
+
 
 class Swish(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
+
     def forward(self, x):
-        return x*torch.sigmoid(x)
+        return x * torch.sigmoid(x)

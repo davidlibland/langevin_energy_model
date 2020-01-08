@@ -32,7 +32,12 @@ class Sampler(ABC):
         """
         raise NotImplementedError
 
-    def visualize(self, fig: plt.Figure, X: np.ndarray, energy: Callable[[np.ndarray], np.ndarray]=None):
+    def visualize(
+        self,
+        fig: plt.Figure,
+        X: np.ndarray,
+        energy: Callable[[np.ndarray], np.ndarray] = None,
+    ):
         """
         Visualize a set of samples, returning a figure.
 
@@ -55,20 +60,17 @@ class Sampler(ABC):
             if energy is not None:
                 ys_ = np.exp(-energy(xs.reshape([-1, 1])))
                 ys = ys_.reshape(-1)
-                Z = ys_.mean()*(x_max-x_min)
-                ax.plot(xs, ys/Z, label="Energy", color="red")
+                Z = ys_.mean() * (x_max - x_min)
+                ax.plot(xs, ys / Z, label="Energy", color="red")
             ax.legend()
         elif X.shape[1] == 2:
             ax.scatter(X[:, 0], X[:, 1], label="Data")
-            x_min, x_max = X[:,0].min(), X[:,0].max()
-            y_min, y_max = X[:,1].min(), X[:,1].max()
+            x_min, x_max = X[:, 0].min(), X[:, 0].max()
+            y_min, y_max = X[:, 1].min(), X[:, 1].max()
             x_support = np.linspace(x_min, x_max, 100)
             y_support = np.linspace(y_min, y_max, 100)
             xx, yy = np.meshgrid(x_support, y_support)
-            XY = np.hstack([
-                xx.reshape([-1, 1]),
-                yy.reshape([-1, 1])
-            ])
+            XY = np.hstack([xx.reshape([-1, 1]), yy.reshape([-1, 1])])
             z_ = np.exp(self.logpdf(XY))
             z = z_.reshape(xx.shape)
             ax.contour(xx, yy, z, 10)
@@ -79,6 +81,7 @@ class Sampler(ABC):
             ax.legend()
         else:
             from sklearn.manifold import TSNE
+
             tsne = TSNE(n_components=2)
             emb = tsne.fit_transform(X)
             ax.scatter(emb[:, 0], emb[:, 1])
@@ -100,7 +103,9 @@ class Distribution(Sampler):
         raise NotImplementedError
 
     @staticmethod
-    def mixture(components: List["Distribution"], weights: Optional[List[float]]=None):
+    def mixture(
+        components: List["Distribution"], weights: Optional[List[float]] = None
+    ):
         """
         Forms a mixture distribution from the components provided.
 
@@ -112,7 +117,9 @@ class Distribution(Sampler):
 
 
 class MixtureDistribution(Distribution):
-    def __init__(self, components: List[Distribution], weights: Optional[List[float]]=None):
+    def __init__(
+        self, components: List[Distribution], weights: Optional[List[float]] = None
+    ):
         """
         Forms a mixture distribution from the components provided.
 
@@ -122,7 +129,7 @@ class MixtureDistribution(Distribution):
         """
         self.n_components = len(components)
         if weights is None:
-            weights = [1/self.n_components for _ in range(self.n_components)]
+            weights = [1 / self.n_components for _ in range(self.n_components)]
         self.weights = weights
         self.components = components
 
@@ -156,15 +163,13 @@ class MixtureDistribution(Distribution):
         Returns:
             tensor ~ (size, n_features)
         """
-        comps = np.random.choice(a=self.components,
-                                 p=self.coefficients,
-                                 size=size)
+        comps = np.random.choice(a=self.components, p=self.coefficients, size=size)
         samples = [comp.rvs(size=1) for comp in comps]
         return np.vstack(samples)
 
 
 class Normal(Distribution):
-    def __init__(self, means: np.ndarray=None, scales: np.ndarray=None):
+    def __init__(self, means: np.ndarray = None, scales: np.ndarray = None):
         if means is None:
             means = np.zeros((1,))
         if scales is None:
@@ -188,8 +193,8 @@ class Normal(Distribution):
         """
         if not isinstance(X, np.ndarray):
             X = np.array(X)
-        H = 0.5*((X - self.means)/self.scales)**2
-        Z = sqrt(2*pi)*self.scales
+        H = 0.5 * ((X - self.means) / self.scales) ** 2
+        Z = sqrt(2 * pi) * self.scales
         return -np.sum(H + np.log(Z), axis=1)
 
     def rvs(self, size: int) -> np.ndarray:
@@ -212,8 +217,7 @@ class Normal(Distribution):
         if gmm.covariance_type == "diag":
             scale_getter = lambda std_ar: std_ar
         elif gmm.covariance_type == "spherical":
-            scale_getter = lambda v: np.array(
-                [v for _ in range(gmm.means_.shape[1])])
+            scale_getter = lambda v: np.array([v for _ in range(gmm.means_.shape[1])])
         for mean_ar, std_ar in zip(gmm.means_, gmm.covariances_):
             scales = scale_getter(std_ar)
             mean = np.array(mean_ar)
@@ -222,9 +226,12 @@ class Normal(Distribution):
 
 
 class ApplyTransform(Distribution):
-    def __init__(self, dist: Distribution,
-                 trans: Callable[[np.ndarray], np.ndarray],
-                 inv_trans: Callable[[np.ndarray], np.ndarray]):
+    def __init__(
+        self,
+        dist: Distribution,
+        trans: Callable[[np.ndarray], np.ndarray],
+        inv_trans: Callable[[np.ndarray], np.ndarray],
+    ):
         """
         Transforms a distribution by provided transformations. Technically,
         this will no longer be a distribution unless these transformations

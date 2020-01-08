@@ -21,6 +21,7 @@ class NumpyEncoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
+
 @pytest.mark.skip
 def test_save_and_restore(tmp_path):
     """Test that save and restore works."""
@@ -29,6 +30,7 @@ def test_save_and_restore(tmp_path):
         dist = Normal(np.array([-3]))
         net = SimpleEnergyModel(1, 2, 2)
         return dist, net
+
     trainer = get_energy_trainer(setup_1d)({"sample_size": 10, "batch_size": 2})
     # run one training step
     trainer.train()
@@ -39,22 +41,20 @@ def test_save_and_restore(tmp_path):
         "global_step_": lambda m: m.global_step_,
         "epoch_": lambda m: m.epoch_,
         "net_": lambda m: json.dumps(m.net_.state_dict(), cls=NumpyEncoder),
-        "model_samples_": lambda m: json.dumps(list(m.model_samples_), cls=NumpyEncoder),
+        "model_samples_": lambda m: json.dumps(
+            list(m.model_samples_), cls=NumpyEncoder
+        ),
         "optimizer_": lambda m: json.dumps(m.optimizer_.state_dict(), cls=NumpyEncoder),
     }
     # Store the state;
-    original_state = {
-        k: f(trainer) for k, f in attributes_to_check.items()
-    }
+    original_state = {k: f(trainer) for k, f in attributes_to_check.items()}
 
     # run some more training steps;
     for _ in range(3):
         trainer.train()
 
     # Store the state;
-    new_state = {
-        k: f(trainer) for k, f in attributes_to_check.items()
-    }
+    new_state = {k: f(trainer) for k, f in attributes_to_check.items()}
 
     # Check that the new state differs from the stored state:
     for k in original_state:
@@ -63,8 +63,6 @@ def test_save_and_restore(tmp_path):
     # Restore from the saved file:
     trainer._restore(save_dir)
 
-    restored_state = {
-        k: f(trainer) for k, f in attributes_to_check.items()
-    }
+    restored_state = {k: f(trainer) for k, f in attributes_to_check.items()}
 
     assert restored_state == original_state, "The restored state differs."

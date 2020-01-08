@@ -4,7 +4,7 @@ import mcmc.abstract
 import utils.beta_schedules
 
 
-class SimulatedTempering(mcmc.abstract.MCSampler):
+class TemperedTransitions(mcmc.abstract.MCSampler):
     def __init__(self, mc_dynamics: mcmc.abstract.MCSampler, beta_schedule=None):
         if beta_schedule is None:
             beta_schedule = utils.beta_schedules.build_schedule(

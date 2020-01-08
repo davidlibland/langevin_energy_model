@@ -21,14 +21,19 @@ class AISState:
 
 
 class AISLoss(CheckpointCallback):
-    def __init__(self, logger: Callable, beta_schedule=None,
-                 num_chains: int=20, num_mc_steps=1,
-                 log_z_update_interval=5, device=None,
-                 mc_dynamics=None):
+    def __init__(
+        self,
+        logger: Callable,
+        beta_schedule=None,
+        num_chains: int = 20,
+        num_mc_steps=1,
+        log_z_update_interval=5,
+        device=None,
+        mc_dynamics=None,
+    ):
         if beta_schedule is None:
             beta_schedule = utils.beta_schedules.build_schedule(
-                ("arith", .01, 200),
-                ("geom", 1., 1000)
+                ("arith", 0.01, 200), ("geom", 1.0, 1000)
             )
         self.beta_schedule = beta_schedule
         self.num_chains = num_chains
@@ -50,11 +55,12 @@ class AISLoss(CheckpointCallback):
         log_w = net(current_samples, beta=0).detach()
         for beta in self.beta_schedule[1:-1]:
             log_w -= net(current_samples, beta=beta).detach()
-            current_samples = net.sample_fantasy(current_samples,
-                                                 num_mc_steps=self.num_mc_steps,
-                                                 beta=beta,
-                                                 mc_dynamics=self.mc_dynamics
-                                                 ).detach()
+            current_samples = net.sample_fantasy(
+                current_samples,
+                num_mc_steps=self.num_mc_steps,
+                beta=beta,
+                mc_dynamics=self.mc_dynamics,
+            ).detach()
             log_w += net(current_samples, beta=beta).detach()
         log_w -= net(current_samples, beta=self.beta_schedule[-1]).detach()
 
@@ -77,16 +83,17 @@ class AISLoss(CheckpointCallback):
         num_chains = log_w.shape[0]
         log_z = torch.logsumexp(log_w, dim=0) - np.log(num_chains)
 
-        loss = float(net(data_sample).mean().cpu()+log_z)
+        loss = float(net(data_sample).mean().cpu() + log_z)
 
         # log the loss:
 
         # get the diagnostics
         log_w_var, effective_sample_size = self.get_diagnostic_stats(log_w)
-        self.logger(loss_ais=loss,
-                    ais_log_w_var=log_w_var,
-                    ais_effective_sample_size=effective_sample_size
-                    )
+        self.logger(
+            loss_ais=loss,
+            ais_log_w_var=log_w_var,
+            ais_effective_sample_size=effective_sample_size,
+        )
 
     @staticmethod
     def get_diagnostic_stats(log_w) -> Tuple[float, float]:

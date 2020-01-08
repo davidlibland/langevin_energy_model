@@ -60,7 +60,7 @@ constant_beta_schedule = utils.beta_schedules.build_schedule(
         ("mala", lambda: mcmc.mala.MALASampler(lr=0.1), 100),
         (
             "tempered langevin",
-            lambda: mcmc.tempered_transitions.SimulatedTempering(
+            lambda: mcmc.tempered_transitions.TemperedTransitions(
                 mc_dynamics=mcmc.langevin.LangevinSampler(lr=0.5),
                 beta_schedule=constant_beta_schedule,
             ),
@@ -68,7 +68,7 @@ constant_beta_schedule = utils.beta_schedules.build_schedule(
         ),
         (
             "tempered mala",
-            lambda: mcmc.tempered_transitions.SimulatedTempering(
+            lambda: mcmc.tempered_transitions.TemperedTransitions(
                 mc_dynamics=mcmc.mala.MALASampler(lr=0.5),
                 beta_schedule=constant_beta_schedule,
             ),
@@ -99,10 +99,10 @@ def test_normal_stats(
 test_samplers = {
     "langevin": lambda: mcmc.langevin.LangevinSampler(lr=0.5),
     "mala": lambda: mcmc.mala.MALASampler(lr=0.5),
-    "tempered langevin": lambda: mcmc.tempered_transitions.SimulatedTempering(
+    "tempered langevin": lambda: mcmc.tempered_transitions.TemperedTransitions(
         mc_dynamics=mcmc.langevin.LangevinSampler(lr=0.5)
     ),
-    "tempered mala": lambda: mcmc.tempered_transitions.SimulatedTempering(
+    "tempered mala": lambda: mcmc.tempered_transitions.TemperedTransitions(
         mc_dynamics=mcmc.mala.MALASampler(lr=0.5)
     ),
 }
