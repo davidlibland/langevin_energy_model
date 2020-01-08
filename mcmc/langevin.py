@@ -4,6 +4,10 @@ from mcmc.abstract import MCSampler
 
 
 class LangevinSampler(MCSampler):
+    """
+    This sampler implements Langevin Dynamics
+    (https://en.wikipedia.org/wiki/Langevin_dynamics)
+    """
     def __init__(self, lr):
         self.lr = lr
 

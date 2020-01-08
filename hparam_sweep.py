@@ -14,7 +14,7 @@ from torch import optim
 
 import mcmc.mala
 import mcmc.langevin
-import mcmc.simulated_tempering
+import mcmc.tempered_transitions
 from distributions import core
 from utils.ais import AISLoss
 import model
@@ -64,7 +64,7 @@ def get_energy_trainer(setup_dist: Callable[[Any], Tuple[core.Sampler, model.Bas
             samplers = {
                 "mala": mcmc.mala.MALASampler(lr=0.1),
                 "langevin": mcmc.langevin.LangevinSampler(lr=0.1),
-                "tempered mala": mcmc.simulated_tempering.SimulatedTempering(mc_dynamics=mcmc.mala.MALASampler(lr=0.1)),
+                "tempered mala": mcmc.tempered_transitions.SimulatedTempering(mc_dynamics=mcmc.mala.MALASampler(lr=0.1)),
             }
             self.sampler = samplers.get(config.get("sampler", "mala"))
             self.verbose = True
