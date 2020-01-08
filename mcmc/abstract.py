@@ -3,7 +3,9 @@ from toolz import curry
 
 
 class MCSampler:
-    def __call__(self, net: "BaseEnergyModel", x: torch.Tensor, beta=None) -> torch.Tensor:
+    def __call__(
+        self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
+    ) -> torch.Tensor:
         """Perform a single MC step."""
         raise NotImplementedError
 

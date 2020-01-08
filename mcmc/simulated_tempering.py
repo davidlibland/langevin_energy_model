@@ -8,14 +8,15 @@ class SimulatedTempering(mcmc.abstract.MCSampler):
     def __init__(self, mc_dynamics: mcmc.abstract.MCSampler, beta_schedule=None):
         if beta_schedule is None:
             beta_schedule = utils.beta_schedules.build_schedule(
-                ("geom", 1., 30),
-                start=0.2
+                ("geom", 1.0, 30), start=0.1
             )
         self.beta_schedule = beta_schedule
         self.mc_dynamics = mc_dynamics
         self.num_mc_steps = 1
 
-    def __call__(self, net: "BaseEnergyModel", x: torch.Tensor, beta=None) -> torch.Tensor:
+    def __call__(
+        self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
+    ) -> torch.Tensor:
         """Perform a single MC step."""
         net.eval()
         current_samples = x
@@ -23,27 +24,30 @@ class SimulatedTempering(mcmc.abstract.MCSampler):
         log_alpha = net(current_samples, beta=self.beta_schedule[-1]).detach()
         for beta in reversed(self.beta_schedule[1:-1]):
             log_alpha -= net(current_samples, beta=beta).detach()
-            current_samples = net.sample_fantasy(current_samples,
-                                                 num_mc_steps=self.num_mc_steps,
-                                                 beta=beta,
-                                                 mc_dynamics=self.mc_dynamics
-                                                 ).detach()
+            current_samples = net.sample_fantasy(
+                current_samples,
+                num_mc_steps=self.num_mc_steps,
+                beta=beta,
+                mc_dynamics=self.mc_dynamics,
+            ).detach()
             log_alpha += net(current_samples, beta=beta).detach()
         # at beta=0
         log_alpha -= net(current_samples, beta=self.beta_schedule[0]).detach()
-        current_samples = net.sample_fantasy(current_samples,
-                                             num_mc_steps=2*self.num_mc_steps,
-                                             beta=self.beta_schedule[0],
-                                             mc_dynamics=self.mc_dynamics
-                                             ).detach()
+        current_samples = net.sample_fantasy(
+            current_samples,
+            num_mc_steps=2 * self.num_mc_steps,
+            beta=self.beta_schedule[0],
+            mc_dynamics=self.mc_dynamics,
+        ).detach()
         log_alpha += net(current_samples, beta=self.beta_schedule[0]).detach()
         for beta in self.beta_schedule[1:-1]:
             log_alpha -= net(current_samples, beta=beta).detach()
-            current_samples = net.sample_fantasy(current_samples,
-                                                 num_mc_steps=self.num_mc_steps,
-                                                 beta=beta,
-                                                 mc_dynamics=self.mc_dynamics
-                                                 ).detach()
+            current_samples = net.sample_fantasy(
+                current_samples,
+                num_mc_steps=self.num_mc_steps,
+                beta=beta,
+                mc_dynamics=self.mc_dynamics,
+            ).detach()
             log_alpha += net(current_samples, beta=beta).detach()
         log_alpha -= net(current_samples, beta=self.beta_schedule[-1]).detach()
 
