@@ -1,13 +1,13 @@
 import random
+import time
 from collections import deque
 from typing import List
-import time
 
 import torch
 import torch.optim as optim
 import torch.utils.data as data
 
-from model import BaseEnergyModel
+from src.model import BaseEnergyModel
 
 # Globals
 

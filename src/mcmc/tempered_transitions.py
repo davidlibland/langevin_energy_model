@@ -1,13 +1,18 @@
+from typing import TYPE_CHECKING
+
 import torch
 
-import mcmc.abstract
-import utils.beta_schedules
+import src.mcmc.abstract
+import src.utils.beta_schedules
+
+if TYPE_CHECKING:
+    from src.model import BaseEnergyModel
 
 
-class TemperedTransitions(mcmc.abstract.MCSampler):
-    def __init__(self, mc_dynamics: mcmc.abstract.MCSampler, beta_schedule=None):
+class TemperedTransitions(src.mcmc.abstract.MCSampler):
+    def __init__(self, mc_dynamics: src.mcmc.abstract.MCSampler, beta_schedule=None):
         if beta_schedule is None:
-            beta_schedule = utils.beta_schedules.build_schedule(
+            beta_schedule = src.utils.beta_schedules.build_schedule(
                 ("geom", 1.0, 30), start=0.1
             )
         self.beta_schedule = beta_schedule

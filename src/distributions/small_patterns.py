@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 from torch.utils.data import Sampler
 
-from distributions.utils import plot_image_samples
+from src.distributions.utils import plot_image_samples
 from .core import Sampler
 
 PATTERNS = {

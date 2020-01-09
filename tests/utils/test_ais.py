@@ -1,14 +1,14 @@
 import numpy as np
+import scipy.special as scisp
 import torch
 import torch.nn as nn
-import scipy.special as scisp
 
-import utils.beta_schedules
-from mcmc.langevin import LangevinSampler
-from mcmc.mala import MALASampler
-from model import BaseEnergyModel
-from model import LANG_INIT_NS
-from utils.ais import AISLoss
+import src.utils.beta_schedules
+from src.mcmc.langevin import LangevinSampler
+from src.mcmc.mala import MALASampler
+from src.model import BaseEnergyModel
+from src.model import LANG_INIT_NS
+from src.utils.ais import AISLoss
 
 
 class DiagonalNormalModel(BaseEnergyModel):
@@ -64,7 +64,7 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
     print(mc_loss)
 
     logger = MockLogger()
-    beta_schedule = utils.beta_schedules.build_schedule(
+    beta_schedule = src.utils.beta_schedules.build_schedule(
         ("arith", 0.01, 200), ("geom", 1.0, 1000)
     )
     ais_loss_obj = AISLoss(

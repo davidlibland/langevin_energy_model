@@ -1,31 +1,29 @@
 from functools import lru_cache
 
 import numpy as np
-from sklearn.datasets import load_digits
+from sklearn.datasets import fetch_openml
 
-from distributions.utils import train_gmm_pca_model, plot_image_samples, get_samples
-from .core import Distribution, Sampler
+from src.distributions.core import Distribution, Sampler
+from src.distributions.utils import plot_image_samples, get_samples, train_gmm_pca_model
 
 
 @lru_cache()
-def get_digit_distribution() -> Sampler:
+def get_mnist_distribution() -> Sampler:
     """
-    Returns a Digits Sampler.
+    Returns a MNIST sampler.
 
     Returns:
-        Sampler: Sampling digits
+        Sampler: Sampling mnist digits
     """
-    X, y = load_digits(return_X_y=True)
+    X, y = fetch_openml("mnist_784", version=1, return_X_y=True)
     X = X.astype(np.float) / X.max()
-    n = X.shape[0]
-    X = X.reshape([n, 8, 8])
-    digit_dist = Sampler.from_samples(X)
-    digit_dist.visualize = plot_image_samples([8, 8], False)
-    return digit_dist
+    mnist_dist = Sampler.from_samples(X)
+    mnist_dist.visualize = plot_image_samples([28, 28], False)
+    return mnist_dist
 
 
 @lru_cache()
-def get_approx_digit_distribution(
+def get_approx_mnist_distribution(
     n_pca_comp=10, n_mixtures=5, covariance_type="spherical"
 ) -> Distribution:
     """
@@ -38,7 +36,7 @@ def get_approx_digit_distribution(
     Returns:
         Distribution: An approximate model of mnist.
     """
-    X, y = load_digits(return_X_y=True)
+    X, y = fetch_openml("mnist_784", version=1, return_X_y=True)
     X = X.astype(np.float) / X.max()
     y = np.array([int(v) for v in y])
     distributions = []
@@ -53,6 +51,6 @@ def get_approx_digit_distribution(
         )
         distributions.append(dist)
     mnist_dist = Distribution.mixture(distributions)
-    mnist_dist.visualize = plot_image_samples([8, 8], False)
+    mnist_dist.visualize = plot_image_samples([28, 28], False)
     mnist_dist.rvs = get_samples(X)
     return mnist_dist

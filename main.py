@@ -2,14 +2,14 @@ import numpy as np
 from ray.tune.schedulers import ASHAScheduler
 from ray import tune
 
-from distributions.core import Distribution, Normal
-from distributions.mnist import get_mnist_distribution
-from distributions.digits import get_digit_distribution
-from distributions.small_digits import get_sm_digit_distribution
-from distributions.small_patterns import get_pattern_distribution
-from hparam_sweep import get_energy_trainer
-from model import ConvEnergyModel
-from model import SimpleEnergyModel, ResnetEnergyModel
+from src.distributions.core import Distribution, Normal
+from src.distributions.mnist import get_mnist_distribution
+from src.distributions.digits import get_digit_distribution
+from src.distributions.small_digits import get_sm_digit_distribution
+from src.distributions.small_patterns import get_pattern_distribution
+from src.hparam_sweep import get_energy_trainer
+from src.model import ConvEnergyModel
+from src.model import SimpleEnergyModel, ResnetEnergyModel
 
 
 def setup_1d(**kwargs):
@@ -104,7 +104,7 @@ if __name__ == "__main__":
             "sampler_lr": tune.loguniform(0.03, 1.0),
         },
         scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
-        num_samples=30,
+        num_samples=2,
         checkpoint_freq=10,
         checkpoint_at_end=True,
         stop=stop_on_low_ais_ess,

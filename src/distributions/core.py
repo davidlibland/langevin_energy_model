@@ -5,17 +5,17 @@ from abc import ABC, abstractmethod
 from math import pi, sqrt
 from typing import Optional, List, Callable
 
-from sklearn.mixture import GaussianMixture
-from scipy.special import logsumexp
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.special import logsumexp
+from sklearn.mixture import GaussianMixture
 
-from distributions.utils import get_samples
+from src.distributions.utils import get_samples
 
 
 class Sampler(ABC):
     @staticmethod
-    def from_samples(X: np.ndarray) -> np.ndarray:
+    def from_samples(X: np.ndarray) -> "Sampler":
         sampler = Sampler()
         sampler.rvs = get_samples(X)
         return sampler
@@ -54,9 +54,10 @@ class Sampler(ABC):
             x_min = X.min()
             x_max = X.max()
             xs = np.linspace(x_min, x_max, 100)
-            ys_ = np.exp(self.logpdf(xs.reshape([-1, 1])))
-            ys = ys_.reshape(-1)
-            ax.plot(xs, ys, label="Actual")
+            if hasattr(self, "logpdf"):
+                ys_ = np.exp(self.logpdf(xs.reshape([-1, 1])))
+                ys = ys_.reshape(-1)
+                ax.plot(xs, ys, label="Actual")
             if energy is not None:
                 ys_ = np.exp(-energy(xs.reshape([-1, 1])))
                 ys = ys_.reshape(-1)
@@ -71,9 +72,10 @@ class Sampler(ABC):
             y_support = np.linspace(y_min, y_max, 100)
             xx, yy = np.meshgrid(x_support, y_support)
             XY = np.hstack([xx.reshape([-1, 1]), yy.reshape([-1, 1])])
-            z_ = np.exp(self.logpdf(XY))
-            z = z_.reshape(xx.shape)
-            ax.contour(xx, yy, z, 10)
+            if hasattr(self, "logpdf"):
+                z_ = np.exp(self.logpdf(XY))
+                z = z_.reshape(xx.shape)
+                ax.contour(xx, yy, z, 10)
             if energy is not None:
                 z_ = np.exp(-energy(XY))
                 z = z_.reshape(xx.shape)

@@ -1,6 +1,11 @@
+from typing import TYPE_CHECKING
+
 import torch
 
-from mcmc.abstract import MCSampler
+from src.mcmc.abstract import MCSampler
+
+if TYPE_CHECKING:
+    from src.model import BaseEnergyModel
 
 
 class LangevinSampler(MCSampler):

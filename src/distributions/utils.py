@@ -1,11 +1,14 @@
 from math import sqrt
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from toolz import curry
+
+if TYPE_CHECKING:
+    from src.distributions.core import Distribution
 
 
 def train_gmm_pca_model(
@@ -22,7 +25,7 @@ def train_gmm_pca_model(
     Returns:
         Distribution modeling the leading PCA components of X.
     """
-    from distributions.core import Normal, ApplyTransform
+    from src.distributions.core import Normal, ApplyTransform
 
     dec = PCA(n_components=n_pca_comp, whiten=True)
     clf = GaussianMixture(n_components=n_mixtures, covariance_type=covariance_type)

@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 import torch
 from toolz import curry
 
-from mcmc.abstract import MCSampler
+from src.mcmc.abstract import MCSampler
+
+if TYPE_CHECKING:
+    from src.model import BaseEnergyModel
 
 UPPER_ACCEPTANCE_BOUND = 0.7
 LOWER_ACCEPTANCE_BOUND = 0.4

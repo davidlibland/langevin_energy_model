@@ -1,16 +1,14 @@
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable
 from typing import Tuple
 
+import numpy as np
 import torch
 
-import numpy as np
-
-import utils.beta_schedules
-from mcmc.mala import MALASampler
-from model import BaseEnergyModel
-from training_loop import CheckpointCallback
+import src.utils.beta_schedules
+from src.mcmc.mala import MALASampler
+from src.model import BaseEnergyModel
+from src.training_loop import CheckpointCallback
 
 
 @dataclass
@@ -32,7 +30,7 @@ class AISLoss(CheckpointCallback):
         mc_dynamics=None,
     ):
         if beta_schedule is None:
-            beta_schedule = utils.beta_schedules.build_schedule(
+            beta_schedule = src.utils.beta_schedules.build_schedule(
                 ("arith", 0.01, 200), ("geom", 1.0, 1000)
             )
         self.beta_schedule = beta_schedule

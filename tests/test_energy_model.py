@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from model import SimpleEnergyModel
+from src.model import SimpleEnergyModel
 
 
 def visual_test_sample_fantasy_(

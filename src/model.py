@@ -5,10 +5,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mcmc.abstract import MCSampler
-from mcmc.mala import MALASampler
-from utils.resnet import BasicBlock as BasicResnetBlock
-from utils.resnet import Swish
+from src.mcmc.abstract import MCSampler
+from src.mcmc.mala import MALASampler
+from src.utils.resnet import BasicBlock as BasicResnetBlock
+from src.utils.resnet import Swish
 
 LANG_INIT_NS = 1
 
@@ -39,6 +39,7 @@ class BaseEnergyModel(nn.Module):
         beta=None,
         num_samples=None,
         mc_dynamics: MCSampler = None,
+        **kwargs
     ):
         """
         Sample fantasy particles.
@@ -52,7 +53,6 @@ class BaseEnergyModel(nn.Module):
             num_samples: If x is not provided, this many samples will be taken
                 from the prior.
             mc_dynamics: The type of dynamincs to use. Defaults to langevin.
-            **kwargs: Any addition kwargs to be passed to the dynamics
 
         Returns:
             Samples.

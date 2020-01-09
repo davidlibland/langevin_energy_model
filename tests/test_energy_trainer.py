@@ -1,15 +1,13 @@
 # content of test_tmp_path.py
 import json
-from typing import Iterable
 
 import numpy as np
 import pytest
 import torch
 
-from distributions.core import Distribution
-from distributions.core import Normal
-from hparam_sweep import get_energy_trainer
-from model import SimpleEnergyModel
+from src.distributions.core import Normal
+from src.hparam_sweep import get_energy_trainer
+from src.model import SimpleEnergyModel
 
 
 class NumpyEncoder(json.JSONEncoder):

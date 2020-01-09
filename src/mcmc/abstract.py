@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 import torch
 from toolz import curry
+
+if TYPE_CHECKING:
+    from src.model import BaseEnergyModel
 
 
 class MCSampler:
