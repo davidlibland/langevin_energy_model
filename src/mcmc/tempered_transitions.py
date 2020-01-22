@@ -23,6 +23,7 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
     ) -> torch.Tensor:
         """Perform a single MC step."""
+        del beta
         net.eval()
         current_samples = x
         # at beta=1

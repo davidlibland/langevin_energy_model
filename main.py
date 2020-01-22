@@ -95,10 +95,11 @@ if __name__ == "__main__":
         name="small_digits",
         config={
             "lr": tune.loguniform(1e-4, 1e-1),
+            "weight_decay": tune.loguniform(1e-1, 1e-4),
             "n_hidden": tune.randint(4, 48),
             "model": tune.choice(["conv", "resnet"]),
             "batch_size": tune.randint(128, 1024),
-            "prior_scale_factor": tune.loguniform(1e-1, 1e2),
+            "prior_scale_factor": tune.loguniform(.5, 1e2),
             "sampler": tune.choice(["tempered langevin", "tempered mala"]),
             "sampler_beta_schedule_start": tune.loguniform(1e-1, 0.6),
             "sampler_lr": tune.loguniform(0.03, 1.0),

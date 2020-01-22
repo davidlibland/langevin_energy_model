@@ -58,6 +58,7 @@ def get_energy_trainer(
     class EnergyTrainer(Trainable):
         def _setup(self, config):
             self.lr = config.get("lr", 1e-2)
+            self.weight_decay = config.get("weight_decay", 1e-1)
             self.num_mc_steps = config.get("num_mc_steps", 1)
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
             self.sample_beta = config.get("sample_beta", 1e1)
@@ -65,7 +66,8 @@ def get_energy_trainer(
             self.sample_size = config.get("sample_size", 10000)
             sampler_lr = config.get("sampler_lr", 0.1)
             sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("geom", 1.0, 30), start=config.get("sampler_beta_schedule_start", 0.1)
+                ("geom", 1.0, config.get("sampler_beta_schedule_num_steps", 30)),
+                start=config.get("sampler_beta_schedule_start", 0.1)
             )
             samplers = {
                 "mala": src.mcmc.mala.MALASampler(lr=sampler_lr),
@@ -89,9 +91,9 @@ def get_energy_trainer(
             self.energy = (
                 lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
             )
-
             self.optimizer_ = optim.Adam(
-                self.net_.parameters(), lr=self.lr, weight_decay=1e-1
+                self.net_.parameters(), lr=self.lr,
+                weight_decay=self.weight_decay
             )
 
             self.dataloader = data.DataLoader(
