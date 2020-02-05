@@ -25,6 +25,7 @@ class LangevinSampler(MCSampler):
         if x.grad is not None:
             x.grad.data.zero_()
         y = net(x, beta=beta).sum()
+        x.retain_grad()
         y.backward()
         grad_x = x.grad
 
