@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from src.mcmc.abstract import MCSampler
 from src.mcmc.mala import MALASampler
 from src.utils.resnet import BasicBlock as BasicResnetBlock
-from src.utils.resnet import Swish
+from src.utils.resnet import swish
 
 LANG_INIT_NS = 1
 
@@ -170,7 +170,7 @@ class ResnetEnergyModel(BaseEnergyModel):
                     in_channels=in_channels,
                     out_channels=num_units,
                     norm_layer=None,
-                    activation=Swish,
+                    activation=swish,
                     spectral_norm=True,
                 )
                 self.internal_layers.append(res_net_layer)
