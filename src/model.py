@@ -182,9 +182,10 @@ class ResnetEnergyModel(BaseEnergyModel):
             #     norm_layer=None,
             #     stride=2
             # )
-            avg_pool = nn.AvgPool2d(kernel_size=2, padding=0)
             # w -= kernel_size[1] - 1
             # h -= kernel_size[0] - 1
+
+            avg_pool = nn.AvgPool2d(kernel_size=2, padding=0)
             w //= 2
             h //= 2
             self.internal_layers.append(avg_pool)
