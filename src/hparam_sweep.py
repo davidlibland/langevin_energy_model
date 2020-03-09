@@ -286,7 +286,7 @@ def get_energy_trainer(
             data_samples, model_samples = self.get_data_and_model_samples()
             self.save_images(model_samples, dir=tmp_checkpoint_dir)
             self.save_images(neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
-            self.save_images(data_samples.detach().cpu().numpy(), dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}")
+            self.save_images(data_samples, dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}")
             self.save_energy_plot(data_samples, model_samples, dir=tmp_checkpoint_dir)
             self.save_energy_plot(data_samples, neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
             self.save_model(dir=tmp_checkpoint_dir)
