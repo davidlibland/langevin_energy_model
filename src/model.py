@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from src.mcmc.abstract import MCSampler
 from src.mcmc.mala import MALASampler
 from src.utils.resnet import BasicBlock as BasicResnetBlock
-from src.utils.resnet import swish
+from src.utils.math import swish
 
 LANG_INIT_NS = 1
 

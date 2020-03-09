@@ -1,5 +1,6 @@
-import torch
 import torch.nn as nn
+
+from src.utils.math import identity
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -79,12 +80,3 @@ class BasicBlock(nn.Module):
         out = self.activation(out)
 
         return out
-
-
-def identity(x):
-    return x
-
-
-def swish(x):
-    return x*torch.sigmoid(x)
-

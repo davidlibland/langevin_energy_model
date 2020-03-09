@@ -93,17 +93,17 @@ def stop_on_low_ais_ess(trial_id, result):
 if __name__ == "__main__":
     analysis = tune.run(
         get_energy_trainer(setup_sm_digits),
-        name="sm_digit_non_convergent",
+        name="small_digits",
         config={
-            "lr": 1e-3, #1e-2, #tune.loguniform(1e-3, 3e-2),
-            "weight_decay": 0, #1e-3, #6, #tune.loguniform(1e-1, 1e1),
-            "n_hidden": 64, #tune.randint(32, 48),
-            "model": tune.choice(["conv"]),#, "resnet"]),
-            "batch_size": 1000, #tune.randint(256, 1024),
-            "prior_scale_factor": 1, #5, #1,
-            "sampler": tune.choice(["langevin"]), #, "langevin", "tempered langevin", "tempered mala"]),
-            "sampler_beta_schedule_start": .6, # tune.loguniform(1e-1, 0.6),
-            "sampler_lr": 1, #tune.loguniform(3e-2, 15), #2
+            "lr": tune.loguniform(1e-3, 3e-2),
+            "weight_decay": tune.loguniform(1e-1, 1e1),
+            "n_hidden": tune.randint(32, 48),
+            "model": tune.choice(["conv", "resnet"]),
+            "batch_size": tune.randint(256, 1024),
+            "prior_scale_factor": 5,
+            "sampler": tune.choice(["tempered mala"]),
+            "sampler_beta_schedule_start": tune.loguniform(1e-1, 0.6),
+            "sampler_lr": tune.loguniform(3e-2, 15),
             "num_mc_steps": 100,
             "num_sample_mc_steps": 100
         },
