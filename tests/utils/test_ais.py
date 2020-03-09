@@ -64,12 +64,8 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
     print(mc_loss)
 
     logger = MockLogger()
-    beta_schedule = src.utils.beta_schedules.build_schedule(
-        ("arith", 0.01, 200), ("geom", 1.0, 1000)
-    )
     ais_loss_obj = AISLoss(
         logger=logger,
-        beta_schedule=beta_schedule,
         num_chains=N,
         mc_dynamics=MALASampler(lr=lr),
     )
@@ -79,7 +75,6 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
 
     ais_loss_obj = AISLoss(
         logger=logger,
-        beta_schedule=beta_schedule,
         num_chains=N,
         mc_dynamics=LangevinSampler(lr=lr),
     )

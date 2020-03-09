@@ -22,18 +22,18 @@ class AISLoss(CheckpointCallback):
     def __init__(
         self,
         logger: Callable,
-        beta_schedule=None,
-        num_chains: int = 20,
+        num_chains: int = 100,
         num_mc_steps=1,
         log_z_update_interval=5,
         device=None,
         mc_dynamics=None,
+        lower_threshold=0.1,
+        num_interpolants=1000,
+        max_interpolants=5000,
     ):
-        if beta_schedule is None:
-            beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("arith", 0.01, 200), ("geom", 1.0, 1000)
-            )
-        self.beta_schedule = beta_schedule
+        self.num_interpolants = num_interpolants
+        self.max_interpolants = max_interpolants
+        self.update_beta_schedule()
         self.num_chains = num_chains
         self.logger = logger
         self.log_z_update_interval = log_z_update_interval
@@ -42,12 +42,23 @@ class AISLoss(CheckpointCallback):
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = device
         self._sample_state = None
+        def prefix_logger(**kwargs):
+            self.logger(**{f"ais_{n}": v for n, v in kwargs.items()})
         if mc_dynamics is None:
-            mc_dynamics = MALASampler(lr=0.1)
+            mc_dynamics = MALASampler(lr=1, logger=prefix_logger)
         self.mc_dynamics = mc_dynamics
+        self.lower_threshold = lower_threshold
+
+    def update_beta_schedule(self):
+        num_arith = self.num_interpolants // 5 + 1
+        num_geom = self.num_interpolants - num_arith
+        self.beta_schedule = src.utils.beta_schedules.build_schedule(
+            ("arith", 0.01, num_arith), ("geom", 1.0, num_geom)
+        )
 
     def update_log_z(self, net: BaseEnergyModel):
         """Update the estimate of log_Z"""
+
         net.eval()
         current_samples = net.sample_from_prior(self.num_chains, device=self.device)
         log_w = net(current_samples, beta=0).detach()
@@ -91,7 +102,17 @@ class AISLoss(CheckpointCallback):
             loss_ais=loss,
             ais_log_w_var=log_w_var,
             ais_effective_sample_size=effective_sample_size,
+            ais_num_interpolants=self.num_interpolants,
         )
+
+        # Increase the number of interpolants if the accuracy is too low.
+        if (
+            self.lower_threshold
+            and effective_sample_size < self.lower_threshold * self.num_chains
+        ):
+            # Increase the number of interpolants:
+            self.num_interpolants *= log_w_var
+            self.num_interpolants = min(self.max_interpolants, self.num_interpolants)
 
     @staticmethod
     def get_diagnostic_stats(log_w) -> Tuple[float, float]:
