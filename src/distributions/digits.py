@@ -16,10 +16,10 @@ def get_digit_distribution() -> Sampler:
         Sampler: Sampling digits
     """
     X, y = load_digits(return_X_y=True)
-    X = X.astype(np.float) / X.max()
+    X = 2 * X.astype(np.float) / X.max() - 1
     n = X.shape[0]
     X = X.reshape([n, 8, 8])
-    digit_dist = Sampler.from_samples(X)
+    digit_dist = Sampler.from_samples(X, noise=lambda shape: 2 * np.random.rand(*shape)/255)
     digit_dist.visualize = plot_image_samples([8, 8], False)
     return digit_dist
 

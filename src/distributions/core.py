@@ -15,9 +15,9 @@ from src.distributions.utils import get_samples
 
 class Sampler(ABC):
     @staticmethod
-    def from_samples(X: np.ndarray) -> "Sampler":
+    def from_samples(X: np.ndarray, noise=None) -> "Sampler":
         sampler = Sampler()
-        sampler.rvs = get_samples(X)
+        sampler.rvs = get_samples(X, noise=noise)
         return sampler
 
     def rvs(self, size: int) -> np.ndarray:

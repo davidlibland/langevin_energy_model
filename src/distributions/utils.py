@@ -66,7 +66,10 @@ def plot_image_samples(
 
 
 @curry
-def get_samples(X: np.ndarray, size: int) -> np.ndarray:
+def get_samples(X: np.ndarray, size: int, noise=None) -> np.ndarray:
     n = X.shape[0]
     samples = np.random.choice(n, size=size, replace=True)
-    return X[samples, ...]
+    if noise is None:
+        return X[samples, ...]
+    result = X[samples, ...]
+    return result + noise(result.shape)
