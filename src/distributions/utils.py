@@ -60,7 +60,7 @@ def plot_image_samples(
     for i in range(n):
         for j in range(n):
             ax[i, j].imshow(
-                X[i + n * j, :].reshape(im_size), cmap="gray", vmin=0, vmax=1
+                X[i + n * j, :].reshape(im_size), cmap="gray", vmin=-1, vmax=1
             )
             ax[i, j].axis("off")
 
