@@ -48,6 +48,7 @@ def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
     dist = get_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
+    scale = 1
     if model == "resnet":
         net = ResnetEnergyModel(
             (1, 4, 4), 2, 2, n_hidden, prior_scale=prior_scale_factor * scale
@@ -86,30 +87,34 @@ def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
 
 def stop_on_low_ais_ess(trial_id, result):
     """Stops trials if the effective sample size falls too low."""
-    return result["ais_effective_sample_size"] < 1
+    return result["ais_effective_sample_size"] < .1
 
 
 if __name__ == "__main__":
     analysis = tune.run(
         get_energy_trainer(setup_sm_digits),
-        name="small_digits",
+        name="sm_digit_non_convergent",
         config={
-            "lr": tune.loguniform(1e-4, 1e-1),
-            "weight_decay": tune.loguniform(1e-1, 1e-4),
-            "n_hidden": tune.randint(4, 48),
-            "model": tune.choice(["conv", "resnet"]),
-            "batch_size": tune.randint(128, 1024),
-            "prior_scale_factor": tune.loguniform(.5, 1e2),
-            "sampler": tune.choice(["tempered langevin", "tempered mala"]),
-            "sampler_beta_schedule_start": tune.loguniform(1e-1, 0.6),
-            "sampler_lr": tune.loguniform(0.03, 1.0),
+            "lr": 1e-3, #1e-2, #tune.loguniform(1e-3, 3e-2),
+            "weight_decay": 0, #1e-3, #6, #tune.loguniform(1e-1, 1e1),
+            "n_hidden": 64, #tune.randint(32, 48),
+            "model": tune.choice(["conv"]),#, "resnet"]),
+            "batch_size": 1000, #tune.randint(256, 1024),
+            "prior_scale_factor": 1, #5, #1,
+            "sampler": tune.choice(["langevin"]), #, "langevin", "tempered langevin", "tempered mala"]),
+            "sampler_beta_schedule_start": .6, # tune.loguniform(1e-1, 0.6),
+            "sampler_lr": 1, #tune.loguniform(3e-2, 15), #2
+            "num_mc_steps": 100,
+            "num_sample_mc_steps": 100
         },
-        scheduler=ASHAScheduler(metric="loss_ais", mode="min"),
-        num_samples=2,
+        scheduler=ASHAScheduler(metric="loss_ais", mode="min", max_t=10**4),
+        num_samples=1,
         checkpoint_freq=10,
         checkpoint_at_end=True,
-        stop=stop_on_low_ais_ess,
-        resources_per_trial={"gpu": 1},
+        # stop=stop_on_low_ais_ess,
+        # resources_per_trial={"gpu": 1},
+        # resume="PROMPT"
+        # restore="/Users/dlibland/ray_results/sm_digit_fives_/EnergyTrainer_0_model=resnet,sampler=mala_2020-02-24_09-39-38fnpaf60f/checkpoint_104"
     )
     df = analysis.dataframe()
     save_filename = input("Where to save the csv?")

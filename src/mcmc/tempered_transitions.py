@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from typing import Callable
 
 import torch
 
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class TemperedTransitions(src.mcmc.abstract.MCSampler):
-    def __init__(self, mc_dynamics: src.mcmc.abstract.MCSampler, beta_schedule=None):
+    def __init__(self, mc_dynamics: src.mcmc.abstract.MCSampler, beta_schedule=None, logger: Callable=None):
         if beta_schedule is None:
             beta_schedule = src.utils.beta_schedules.build_schedule(
                 ("geom", 1.0, 30), start=0.1
@@ -18,6 +19,7 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         self.beta_schedule = beta_schedule
         self.mc_dynamics = mc_dynamics
         self.num_mc_steps = 1
+        self.logger = logger if logger is not None else lambda *args, **kwargs: None
 
     def __call__(
         self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
@@ -60,5 +62,9 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         alpha = torch.exp(torch.clamp_max(log_alpha, 0))
         mask = torch.rand(x.shape[0], 1, device=alpha.device) < alpha
 
-        # acceptance_ratio = torch.mean(mask.float()).float()
-        return torch.where(mask, current_samples, x).detach()
+        acceptance_ratio = torch.mean(mask.float()).float()
+        self.logger(tempered_acceptance_ratio=float(acceptance_ratio))
+        result = torch.where(mask, current_samples, x).detach()
+        avg_distance = src.utils.math.avg_norm(result - x)
+        self.logger(tempered_avg_sample_distance=float(avg_distance))
+        return result

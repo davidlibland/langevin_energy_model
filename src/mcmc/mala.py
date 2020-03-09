@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
+from typing import Callable
 
 import torch
 from toolz import curry
 
+import src.utils.math
 from src.mcmc.abstract import MCSampler
 
 if TYPE_CHECKING:
@@ -14,9 +16,10 @@ LR_ADJUSTMENT = 1.0001
 
 
 class MALASampler(MCSampler):
-    def __init__(self, lr):
+    def __init__(self, lr, logger: Callable=None):
         self.lr = lr
         self.acceptance_ratio = 0.5
+        self.logger = logger if logger is not None else lambda *args, **kwargs: None
 
     def __call__(
         self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
@@ -30,6 +33,9 @@ class MALASampler(MCSampler):
         y.sum().backward()
         grad_x = x.grad
 
+        avg_energy_grad=float(src.utils.math.avg_norm(grad_x))
+        self.logger(avg_energy_grad=avg_energy_grad)
+
         # Hack to keep gradients in control:
         lr = self.lr / max(1, float(grad_x.abs().max()))
 
@@ -37,6 +43,8 @@ class MALASampler(MCSampler):
         x_det = (x - lr * grad_x).detach()
         noise_f = noise_scale * torch.randn_like(x)
         x_ = x_det + noise_f
+
+        self.logger(energy_grad_to_noise=avg_energy_grad*lr/float(noise_scale))
 
         log_q_x_x = -(noise_f ** 2).sum(dim=1, keepdim=True) / (4 * lr)
 
@@ -62,7 +70,12 @@ class MALASampler(MCSampler):
         self.acceptance_ratio = float(
             0.1 * acceptance_ratio + 0.9 * self.acceptance_ratio
         )
-        return torch.where(mask, x_, x).detach()
+        self.logger(mala_lr=float(self.lr), mala_acceptance_ratio=float(acceptance_ratio))
+        result = torch.where(mask, x_, x).detach()
+        avg_distance = src.utils.math.avg_norm(result - x)
+        self.logger(avg_sample_distance=float(avg_distance))
+        return result
+
 
     @staticmethod
     def log_q(net, lr, x_, x, beta):
