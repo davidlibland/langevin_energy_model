@@ -42,10 +42,12 @@ class AISLoss(CheckpointCallback):
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = device
         self._sample_state = None
+
         def prefix_logger(**kwargs):
             self.logger(**{f"ais_{n}": v for n, v in kwargs.items()})
+
         if mc_dynamics is None:
-            mc_dynamics = MALASampler(lr=1, logger=prefix_logger)
+            mc_dynamics = MALASampler(lr=3e-2, logger=prefix_logger)
         self.mc_dynamics = mc_dynamics
         self.lower_threshold = lower_threshold
 
@@ -64,6 +66,7 @@ class AISLoss(CheckpointCallback):
         log_w = net(current_samples, beta=0).detach()
         for beta in self.beta_schedule[1:-1]:
             log_w -= net(current_samples, beta=beta).detach()
+            print(f"shapes: log_w: {log_w.shape} current_samples: {current_samples.shape}")
             current_samples = net.sample_fantasy(
                 current_samples,
                 num_mc_steps=self.num_mc_steps,

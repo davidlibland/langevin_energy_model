@@ -69,21 +69,33 @@ def get_energy_trainer(
             self.sample_size = config.get("sample_size", 10000)
             sampler_lr = config.get("sampler_lr", 0.1)
             sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("geom", 1.0, config.get("sampler_beta_schedule_num_steps", 30)),
+                (
+                    "geom",
+                    config.get("sampler_beta_schedule_stop", 1.0),
+                    config.get("sampler_beta_schedule_num_steps", 30),
+                ),
                 start=config.get("sampler_beta_schedule_start", 0.1),
             )
             samplers = {
                 "mala": src.mcmc.mala.MALASampler(lr=sampler_lr, logger=self.logger_),
-                "langevin": src.mcmc.langevin.LangevinSampler(lr=sampler_lr, logger=self.logger_),
-                "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.langevin.LangevinSampler(lr=sampler_lr, logger=self.logger_),
+                "langevin": src.mcmc.langevin.LangevinSampler(
+                    lr=sampler_lr,
                     beta_schedule=sampler_beta_schedule,
                     logger=self.logger_
                 ),
-                "tempered mala": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.mala.MALASampler(lr=sampler_lr, logger=self.logger_),
+                "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=src.mcmc.langevin.LangevinSampler(
+                        lr=sampler_lr, logger=self.logger_
+                    ),
                     beta_schedule=sampler_beta_schedule,
-                    logger=self.logger_
+                    logger=self.logger_,
+                ),
+                "tempered mala": src.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=src.mcmc.mala.MALASampler(
+                        lr=sampler_lr, logger=self.logger_
+                    ),
+                    beta_schedule=sampler_beta_schedule,
+                    logger=self.logger_,
                 ),
             }
             self.sampler = samplers.get(config.get("sampler", "mala"))
@@ -94,7 +106,10 @@ def get_energy_trainer(
             print(self.samples.shape)
             dataset = data.TensorDataset(torch.tensor(self.samples, dtype=torch.float))
             self.energy = (
-                lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
+                lambda x: self.net_(torch.tensor(x, dtype=torch.float).to(self.device))
+                .detach()
+                .cpu()
+                .numpy()
             )
             self.optimizer_ = optim.Adam(
                 self.net_.parameters(), lr=self.lr, weight_decay=self.weight_decay
@@ -114,7 +129,12 @@ def get_energy_trainer(
             self.epoch_ = 0
             self.model_samples_ = None
 
-            self.ais_loss = AISLoss(logger=self.logger_, log_z_update_interval=9)
+            self.ais_loss = AISLoss(
+                logger=self.logger_,
+                log_z_update_interval=9,
+                max_interpolants=3000,
+                num_interpolants=2000,
+            )
             self.step_callbacks = [self.ais_loss]
 
         def get_data_and_model_samples(self):
@@ -163,7 +183,7 @@ def get_energy_trainer(
             fig.clear()
             ax = fig.subplots(1, 1)
             ax.hist(energies, density=True, label=["data", "model"])
-            ax.legend(prop={'size': 10})
+            ax.legend(prop={"size": 10})
 
             plot_fn = os.path.join(dir, f"energies_{label}.png")
             fig.savefig(plot_fn)
@@ -202,6 +222,7 @@ def get_energy_trainer(
                 self.global_step_ += 1
                 batch_start_time = time.time()
                 data_sample = sample_batched[0].to(self.device)
+                print(f"data_sample_shape: {data_sample.shape}")
 
                 # Get model samples, either from replay buffer or noise.
                 if self.model_samples_ is None:
@@ -210,6 +231,7 @@ def get_energy_trainer(
                             self.net_.sample_from_prior(
                                 data_sample.shape[0], device=self.device
                             ).detach()
+                            # data_sample
                         ]
                     )
                 elif len(self.model_samples_) > MAX_REPLAY:
@@ -226,16 +248,29 @@ def get_energy_trainer(
                 while len(mask.shape) < len(replay_sample.shape):
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
+                print(f"mask: {mask.shape}, replay: {replay_sample.shape}, noise: {noise_sample.shape}")
                 model_sample = torch.where(
                     mask.to(self.device), replay_sample, noise_sample
                 )
 
                 self.net_.eval()
+                print(f"data_shape: {data_sample.shape}, model_shape: {model_sample.shape}")
+                data_energy = self.net_(data_sample)
+                # Run at least one iteration
                 model_sample = self.net_.sample_fantasy(
                     model_sample,
                     num_mc_steps=self.num_mc_steps,
                     mc_dynamics=self.sampler,
                 ).detach()
+                model_energy = self.net_(model_sample)
+                while model_energy.mean() > data_energy.mean() + 2*data_energy.std():
+                    print(f"objective: {data_energy.mean()-model_energy.mean()}")
+                    model_sample = self.net_.sample_fantasy(
+                        model_sample,
+                        num_mc_steps=self.num_mc_steps,
+                        mc_dynamics=self.sampler,
+                    ).detach()
+                    model_energy = self.net_(model_sample)
 
                 self.model_samples_.append(model_sample)
 
@@ -285,10 +320,19 @@ def get_energy_trainer(
             neg_samples = self.model_samples_[-1].detach().cpu().numpy()
             data_samples, model_samples = self.get_data_and_model_samples()
             self.save_images(model_samples, dir=tmp_checkpoint_dir)
-            self.save_images(neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
-            self.save_images(data_samples, dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}")
+            self.save_images(
+                neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}"
+            )
+            self.save_images(
+                data_samples, dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}"
+            )
             self.save_energy_plot(data_samples, model_samples, dir=tmp_checkpoint_dir)
-            self.save_energy_plot(data_samples, neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
+            self.save_energy_plot(
+                data_samples,
+                neg_samples,
+                dir=tmp_checkpoint_dir,
+                label=f"_neg_{self.global_step_}",
+            )
             self.save_model(dir=tmp_checkpoint_dir)
             return tmp_checkpoint_dir
 

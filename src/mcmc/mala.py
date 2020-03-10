@@ -16,7 +16,7 @@ LR_ADJUSTMENT = 1.0001
 
 
 class MALASampler(MCSampler):
-    def __init__(self, lr, logger: Callable=None):
+    def __init__(self, lr, logger: Callable = None):
         self.lr = lr
         self.acceptance_ratio = 0.5
         self.logger = logger if logger is not None else lambda *args, **kwargs: None
@@ -33,7 +33,7 @@ class MALASampler(MCSampler):
         y.sum().backward()
         grad_x = x.grad
 
-        avg_energy_grad=float(src.utils.math.avg_norm(grad_x))
+        avg_energy_grad = float(src.utils.math.avg_norm(grad_x))
         self.logger(avg_energy_grad=avg_energy_grad)
 
         # Hack to keep gradients in control:
@@ -44,9 +44,9 @@ class MALASampler(MCSampler):
         noise_f = noise_scale * torch.randn_like(x)
         x_ = x_det + noise_f
 
-        self.logger(energy_grad_to_noise=avg_energy_grad*lr/float(noise_scale))
+        self.logger(energy_grad_to_noise=avg_energy_grad * lr / float(noise_scale))
 
-        log_q_x_x = -(noise_f ** 2).sum(dim=1, keepdim=True) / (4 * lr)
+        log_q_x_x = -(noise_f ** 2).sum(dim=net.feature_dims) / (4 * lr)
 
         x_.requires_grad_(True)
         if x_.grad is not None:
@@ -55,7 +55,7 @@ class MALASampler(MCSampler):
         y_.sum().backward()
         grad_x_ = x_.grad
 
-        eps = ((x - x_ + lr * grad_x_) ** 2).sum(dim=1, keepdim=True)
+        eps = ((x - x_ + lr * grad_x_) ** 2).sum(dim=net.feature_dims)
         log_q_xx_ = -eps / (4 * lr)
 
         log_alpha = y - y_ + log_q_xx_ - log_q_x_x
@@ -70,12 +70,16 @@ class MALASampler(MCSampler):
         self.acceptance_ratio = float(
             0.1 * acceptance_ratio + 0.9 * self.acceptance_ratio
         )
-        self.logger(mala_lr=float(self.lr), mala_acceptance_ratio=float(acceptance_ratio))
+        self.logger(
+            mala_lr=float(self.lr), mala_acceptance_ratio=float(acceptance_ratio)
+        )
+        while len(mask.shape) < len(x.shape):
+            # Add extra feature-dims
+            mask.unsqueeze_(dim=-1)
         result = torch.where(mask, x_, x).detach()
         avg_distance = src.utils.math.avg_norm(result - x)
         self.logger(avg_sample_distance=float(avg_distance))
         return result
-
 
     @staticmethod
     def log_q(net, lr, x_, x, beta):
@@ -86,7 +90,7 @@ class MALASampler(MCSampler):
         y.backward()
         grad_x = x.grad
 
-        eps = ((x_ - x + lr * grad_x) ** 2).sum(dim=1, keepdim=True)
+        eps = ((x_ - x + lr * grad_x) ** 2).sum(dim=net.feature_dims)
         return -eps / (4 * lr)
 
     @curry

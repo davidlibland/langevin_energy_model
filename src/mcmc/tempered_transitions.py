@@ -11,10 +11,15 @@ if TYPE_CHECKING:
 
 
 class TemperedTransitions(src.mcmc.abstract.MCSampler):
-    def __init__(self, mc_dynamics: src.mcmc.abstract.MCSampler, beta_schedule=None, logger: Callable=None):
+    def __init__(
+        self,
+        mc_dynamics: src.mcmc.abstract.MCSampler,
+        beta_schedule=None,
+        logger: Callable = None,
+    ):
         if beta_schedule is None:
             beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("geom", 1.0, 30), start=0.1
+                ("geom", 1.0, 30), start=0.1,
             )
         self.beta_schedule = beta_schedule
         self.mc_dynamics = mc_dynamics

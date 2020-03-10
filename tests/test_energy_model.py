@@ -18,9 +18,7 @@ def visual_test_sample_fantasy_(
     fig.clear()
     ax = fig.subplots(1, 1)
     if net is None:
-        net = SimpleEnergyModel(
-            num_inputs=1, num_layers=num_layers, num_units=num_units
-        )
+        net = SimpleEnergyModel()
     X = torch.randn(num_chains, 1, dtype=torch.float)
     X_s = []
     for _ in range(num_steps):

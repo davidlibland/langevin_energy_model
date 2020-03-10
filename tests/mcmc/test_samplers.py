@@ -13,12 +13,11 @@ from src import model
 
 
 class NormalNet(model.BaseEnergyModel):
-    def __init__(self, scale=1, mc_dynamics=None):
+    def __init__(self, data_shape, prior_scale=LANG_INIT_NS:
         num_features = 1
-        super().__init__(
-            num_features=num_features, mc_dynamics=mc_dynamics, prior_scale=1
-        )
-        self.scale = scale
+        super().__init__(data_shape=num_features, prior_scale=1,
+                         mc_dynamics=mc_dynamics)
+        self.scale = data_shape
 
     def energy(self, x):
         energy = torch.sum(((x / self.scale) ** 2) / 2, dim=1, keepdim=True)
@@ -33,9 +32,8 @@ class NormalNet(model.BaseEnergyModel):
 class MixtureNormalNet(model.BaseEnergyModel):
     def __init__(self, locs=(-6, 6), scales=(1, 1), mc_dynamics=None):
         num_features = 1
-        super().__init__(
-            num_features=num_features, mc_dynamics=mc_dynamics, prior_scale=10
-        )
+        super().__init__(data_shape=num_features, prior_scale=10,
+                         mc_dynamics=mc_dynamics)
         self.locs = locs
         self.scales = scales
 

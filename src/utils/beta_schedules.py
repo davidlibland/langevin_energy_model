@@ -36,7 +36,7 @@ def build_schedule(
     sequence = []
     stop = 0
     for seq_type, stop, num in instructions:
-        assert 0 < stop <= 1, (
+        assert 0 < stop, (
             f"Invalid input: {seq_type, stop, num} "
             f"stops must lie in the half open interval."
         )
@@ -54,7 +54,7 @@ def build_schedule(
             raise ValueError(f"Unrecognized sequence type: {seq_type}")
         sequence.append(seq)
         start = stop
-    assert stop == 1, "The instructions must end at 1."
+    # assert stop == 1, "The instructions must end at 1."
     schedule = np.concatenate(sequence).flatten()
     schedule[-1] = 1  # Ensure it ends at 1 (despite numerical errors).
     return schedule
