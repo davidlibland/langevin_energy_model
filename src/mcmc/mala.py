@@ -60,7 +60,7 @@ class MALASampler(MCSampler):
 
         log_alpha = y - y_ + log_q_xx_ - log_q_x_x
         alpha = torch.exp(torch.clamp_max(log_alpha, 0))
-        mask = torch.rand(x.shape[0], 1, device=alpha.device) < alpha
+        mask = torch.rand(x.shape[0], device=alpha.device) < alpha
         # adjust the learning rate based on the acceptance ratio:
         acceptance_ratio = torch.mean(mask.float()).float()
         if acceptance_ratio.float() < LOWER_ACCEPTANCE_BOUND:

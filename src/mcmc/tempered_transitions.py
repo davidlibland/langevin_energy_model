@@ -65,8 +65,11 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         log_alpha -= net(current_samples, beta=self.beta_schedule[-1]).detach()
 
         alpha = torch.exp(torch.clamp_max(log_alpha, 0))
-        mask = torch.rand(x.shape[0], 1, device=alpha.device) < alpha
+        mask = torch.rand(x.shape[0], device=alpha.device) < alpha
 
+        while len(mask.shape) < len(x.shape):
+            # Add extra feature-dims
+            mask.unsqueeze_(dim=-1)
         acceptance_ratio = torch.mean(mask.float()).float()
         self.logger(tempered_acceptance_ratio=float(acceptance_ratio))
         result = torch.where(mask, current_samples, x).detach()

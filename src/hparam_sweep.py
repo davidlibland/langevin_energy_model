@@ -81,7 +81,7 @@ def get_energy_trainer(
                 "langevin": src.mcmc.langevin.LangevinSampler(
                     lr=sampler_lr,
                     beta_schedule=sampler_beta_schedule,
-                    logger=self.logger_
+                    logger=self.logger_,
                 ),
                 "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
                     mc_dynamics=src.mcmc.langevin.LangevinSampler(
@@ -248,13 +248,18 @@ def get_energy_trainer(
                 while len(mask.shape) < len(replay_sample.shape):
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
-                print(f"mask: {mask.shape}, replay: {replay_sample.shape}, noise: {noise_sample.shape}")
+
+                print(
+                    f"mask: {mask.shape}, replay: {replay_sample.shape}, noise: {noise_sample.shape}"
+                )
                 model_sample = torch.where(
                     mask.to(self.device), replay_sample, noise_sample
                 )
 
                 self.net_.eval()
-                print(f"data_shape: {data_sample.shape}, model_shape: {model_sample.shape}")
+                print(
+                    f"data_shape: {data_sample.shape}, model_shape: {model_sample.shape}"
+                )
                 data_energy = self.net_(data_sample)
                 # Run at least one iteration
                 model_sample = self.net_.sample_fantasy(
@@ -263,7 +268,7 @@ def get_energy_trainer(
                     mc_dynamics=self.sampler,
                 ).detach()
                 model_energy = self.net_(model_sample)
-                while model_energy.mean() > data_energy.mean() + 2*data_energy.std():
+                while model_energy.mean() > data_energy.mean() + 2 * data_energy.std():
                     print(f"objective: {data_energy.mean()-model_energy.mean()}")
                     model_sample = self.net_.sample_fantasy(
                         model_sample,

@@ -12,17 +12,17 @@ from src.utils.ais import AISLoss
 
 
 class DiagonalNormalModel(BaseEnergyModel):
-    def __init__(self, data_shape, prior_scale=LANG_INIT_NS:
-        super().__init__(data_shape=data_shape, prior_scale=prior_scale)
-        self.mean = nn.Parameter(torch.randn(1, data_shape))
-        self.log_scale = nn.Parameter(torch.randn(1, data_shape))
+    def __init__(self, num_features, prior_scale=LANG_INIT_NS):
+        super().__init__(input_shape=(num_features,), prior_scale=prior_scale)
+        self.mean = nn.Parameter(torch.randn(1, num_features))
+        self.log_scale = nn.Parameter(torch.randn(1, num_features))
 
     def energy(self, x):
         log_z = (0.5 * np.log(2 * np.pi) + self.log_scale).sum()
         result = (0.5 * ((x - self.mean) / torch.exp(self.log_scale)) ** 2).sum(
             dim=1, keepdim=True
         ) + log_z
-        return result
+        return result.squeeze(-1)
 
     def loss(self, x):
         denom = torch.exp(2 * self.log_scale) + self.prior_scale ** 2
@@ -49,7 +49,7 @@ class MockLogger:
 
 
 def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
-    net = DiagonalNormalModel()
+    net = DiagonalNormalModel(num_features)
     X = torch.randn(num_samples, num_features)
     N = num_chains
     Y = torch.randn(N, num_features)

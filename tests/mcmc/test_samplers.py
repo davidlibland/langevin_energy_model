@@ -13,15 +13,17 @@ from src import model
 
 
 class NormalNet(model.BaseEnergyModel):
-    def __init__(self, data_shape, prior_scale=LANG_INIT_NS:
+    def __init__(self, scale=1):
         num_features = 1
-        super().__init__(data_shape=num_features, prior_scale=1,
-                         mc_dynamics=mc_dynamics)
-        self.scale = data_shape
+        super().__init__(
+            input_shape=(num_features,), prior_scale=1
+        )
+        self.scale = scale
 
     def energy(self, x):
-        energy = torch.sum(((x / self.scale) ** 2) / 2, dim=1, keepdim=True)
-        return energy
+        energy = torch.sum(((x / self.scale) ** 2) / 2, dim=1)
+        result = energy.squeeze(-1)
+        return result
 
     def variance(self, beta=1):
         """Computes the variance at a given beta."""
@@ -30,10 +32,11 @@ class NormalNet(model.BaseEnergyModel):
 
 
 class MixtureNormalNet(model.BaseEnergyModel):
-    def __init__(self, locs=(-6, 6), scales=(1, 1), mc_dynamics=None):
+    def __init__(self, locs=(-6, 6), scales=(1, 1)):
         num_features = 1
-        super().__init__(data_shape=num_features, prior_scale=10,
-                         mc_dynamics=mc_dynamics)
+        super().__init__(
+            input_shape=(num_features,), prior_scale=10
+        )
         self.locs = locs
         self.scales = scales
 
@@ -42,7 +45,7 @@ class MixtureNormalNet(model.BaseEnergyModel):
             torch.sum((((x - loc) / scale) ** 2) / 2, dim=1, keepdim=True)
             for loc, scale in zip(self.locs, self.scales)
         ]
-        return -torch.logsumexp(-torch.stack(energies, dim=1), dim=1)
+        return -torch.logsumexp(-torch.stack(energies, dim=1), dim=1).squeeze(-1)
 
 
 @pytest.mark.parametrize(
@@ -70,11 +73,12 @@ def test_normal_stats(
     name, fsampler, num_steps, mean_tolerance=0.05, std_tolerance=0.05, num_samples=5000
 ):
     """Tests that samplers derive correct normal stats."""
-    net = NormalNet(mc_dynamics=fsampler())
+    net = NormalNet()
+    sampler = fsampler()
     samples = []
     x = None
     for _ in range(num_steps):
-        x = net.sample_fantasy(x, num_mc_steps=1, num_samples=num_samples)
+        x = net.sample_fantasy(x, num_mc_steps=1, num_samples=num_samples, mc_dynamics=sampler)
         samples.append(x)
     all_x = torch.stack(samples[num_steps // 2 :])
     mean = torch.mean(all_x)
