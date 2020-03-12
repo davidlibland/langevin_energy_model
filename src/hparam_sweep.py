@@ -222,7 +222,6 @@ def get_energy_trainer(
                 self.global_step_ += 1
                 batch_start_time = time.time()
                 data_sample = sample_batched[0].to(self.device)
-                print(f"data_sample_shape: {data_sample.shape}")
 
                 # Get model samples, either from replay buffer or noise.
                 if self.model_samples_ is None:
@@ -231,7 +230,6 @@ def get_energy_trainer(
                             self.net_.sample_from_prior(
                                 data_sample.shape[0], device=self.device
                             ).detach()
-                            # data_sample
                         ]
                     )
                 elif len(self.model_samples_) > MAX_REPLAY:
@@ -249,42 +247,38 @@ def get_energy_trainer(
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
 
-                print(
-                    f"mask: {mask.shape}, replay: {replay_sample.shape}, noise: {noise_sample.shape}"
-                )
                 model_sample = torch.where(
                     mask.to(self.device), replay_sample, noise_sample
                 )
 
                 self.net_.eval()
-                print(
-                    f"data_shape: {data_sample.shape}, model_shape: {model_sample.shape}"
-                )
-                data_energy = self.net_(data_sample)
                 # Run at least one iteration
                 model_sample = self.net_.sample_fantasy(
                     model_sample,
                     num_mc_steps=self.num_mc_steps,
                     mc_dynamics=self.sampler,
                 ).detach()
-                model_energy = self.net_(model_sample)
-                while model_energy.mean() > data_energy.mean() + 2 * data_energy.std():
-                    print(f"objective: {data_energy.mean()-model_energy.mean()}")
-                    model_sample = self.net_.sample_fantasy(
-                        model_sample,
-                        num_mc_steps=self.num_mc_steps,
-                        mc_dynamics=self.sampler,
-                    ).detach()
-                    model_energy = self.net_(model_sample)
 
                 self.model_samples_.append(model_sample)
+
+                # Sanity checks:
+                assert data_sample.shape[1:] == self.net_.input_shape, \
+                    "Data is incompatible with network."
+                assert model_sample.shape[1:] == data_sample.shape[1:], \
+                    "Model and data samples are incompatible."
 
                 # Forward gradient:
                 self.net_.train()
                 self.net_.zero_grad()
-                objective = (
-                    self.net_(data_sample).mean() - self.net_(model_sample).mean()
-                )
+                data_energy_mean = self.net_(data_sample).mean()
+                model_energy = self.net_(model_sample)
+                model_energy_mean = model_energy.mean()
+
+                # Estimate the odds of the data's energy based on a normal fitted to
+                # model samples:
+                data_erf = torch.erf((data_energy_mean-model_energy_mean)/model_energy.std())
+
+                objective = data_energy_mean - model_energy_mean
                 objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_value_(self.net_.parameters(), 1e2)
                 self.optimizer_.step()
@@ -292,6 +286,7 @@ def get_energy_trainer(
                 batch_training_time = time.time() - batch_start_time
                 epoch_training_time += batch_training_time
                 self.logger_(energy_diff=float(objective))
+                self.logger_(data_erf=float(data_erf))
 
                 tr_metrics_start_time = time.time()
                 for callback in self.step_callbacks:
@@ -307,7 +302,13 @@ def get_energy_trainer(
                 epoch_metrics_time += tr_metrics_time
                 if self.verbose:
                     print(
-                        f"on epoch {self.epoch_}, batch {i_batch}, objective: {objective}"
+                        f"on epoch {self.epoch_}, batch {i_batch}, data erf: {data_erf}, objective: {objective}"
+                    )
+                    print(
+                        f"model energy: {model_energy_mean} +- {model_energy.std()}"
+                    )
+                    print(
+                        f"data energy: {data_energy_mean}"
                     )
                     print(
                         f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s"

@@ -1,6 +1,9 @@
 import pytest
 
 import src.model
+import src.mcmc.langevin
+import src.mcmc.mala
+import src.mcmc.tempered_transitions
 
 
 @pytest.mark.parametrize("model_factory,model_args", [
@@ -50,6 +53,11 @@ def test_model_sampling(model_factory, model_args, name, fsampler, num_steps):
     samples = model.sample_from_prior(num_samples)
     energy = model(samples)
 
+    assert samples.shape[1:] == model.input_shape, "Prior samples not of the correct shape."
+
     assert energy.shape == (num_samples,), "Energy was not of the expected shape."
 
     mc_dynamics = fsampler()
+    model_samples = model.sample_fantasy(samples, num_mc_steps=5, mc_dynamics=mc_dynamics)
+
+    assert model_samples.shape[1:] == model.input_shape, "Model samples not of the correct shape."

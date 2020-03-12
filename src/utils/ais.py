@@ -66,9 +66,6 @@ class AISLoss(CheckpointCallback):
         log_w = net(current_samples, beta=0).detach()
         for beta in self.beta_schedule[1:-1]:
             log_w -= net(current_samples, beta=beta).detach()
-            print(
-                f"shapes: log_w: {log_w.shape} current_samples: {current_samples.shape}"
-            )
             current_samples = net.sample_fantasy(
                 current_samples,
                 num_mc_steps=self.num_mc_steps,
