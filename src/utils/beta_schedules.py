@@ -56,5 +56,5 @@ def build_schedule(
         start = stop
     # assert stop == 1, "The instructions must end at 1."
     schedule = np.concatenate(sequence).flatten()
-    schedule[-1] = 1  # Ensure it ends at 1 (despite numerical errors).
+    schedule[-1] = stop  # Ensure it ends at stop (despite numerical errors).
     return schedule

@@ -18,14 +18,15 @@ import src.mcmc.mala
 import src.mcmc.tempered_transitions
 import src.utils.ais
 import src.utils.beta_schedules
+import src.utils.constraints
 from src import model
 from src.distributions import core
 from src.utils.ais import AISLoss
 
 # Globals (make these configurable)
 
-MAX_REPLAY = 100
-REPLAY_PROB = 0.95
+MAX_REPLAY = 0
+REPLAY_PROB = 0.99
 
 
 class Logger:
@@ -66,7 +67,7 @@ def get_energy_trainer(
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
             self.sample_beta = config.get("sample_beta", 1)
             self.batch_size = config.get("batch_size", 1024)
-            self.sample_size = config.get("sample_size", 10000)
+            self.sample_size = config.get("sample_size", 30000)
             sampler_lr = config.get("sampler_lr", 0.1)
             sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
                 (
@@ -319,6 +320,7 @@ def get_energy_trainer(
                 for k, v in means.items():
                     print(f"{k}: {v}")
             self.logger_.flush()
+            means["loss"] = src.utils.constraints.add_soft_constraint(means["loss_ais"], means["data_erf"], lower_bound=-1)
             return means
 
         def _save(self, tmp_checkpoint_dir):
