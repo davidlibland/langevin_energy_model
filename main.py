@@ -53,7 +53,6 @@ def setup_sm_digits(model="conv", n_hidden=12, prior_scale_factor=5, **kwargs):
     dist = get_sm_digit_distribution()
     n = 1000
     scale = np.sqrt((dist.rvs(n) ** 2).sum() / n)
-    scale = 1
     if model == "resnet":
         net = ResnetEnergyModel((1, 4, 4), 2, 2, n_hidden)
     else:

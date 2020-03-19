@@ -228,7 +228,7 @@ class ResnetEnergyModel(BaseEnergyModel):
         n = x.shape[0]
         x = torch.reshape(x, (n,) + self.input_shape)
         _, h, w = self.input_shape
-        ones = torch.ones((n, 1, h, w))
+        ones = torch.ones((n, 1, h, w)).to(x.device)
         x = torch.cat([ones, x], dim=1)  # add a channel of 1s to distinguish padding.
         for layer in self.internal_layers[:-1]:
             x = layer(x)
