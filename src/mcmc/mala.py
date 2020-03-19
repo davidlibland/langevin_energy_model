@@ -16,19 +16,23 @@ LR_ADJUSTMENT = 1.0001
 
 
 class MALASampler(MCSampler):
-    def __init__(self, lr, logger: Callable = None):
+    def __init__(self, lr, beta=None, logger: Callable = None):
         self.lr = lr
         self.acceptance_ratio = 0.5
+        self.beta = 1 if beta is None else beta
         self.logger = logger if logger is not None else lambda *args, **kwargs: None
 
     def __call__(
         self, net: "BaseEnergyModel", x: torch.Tensor, beta=None
     ) -> torch.Tensor:
         """Perform a single metropolis adjusted langevin MC update."""
+        if beta is None:
+            beta = self.beta
+
         x.requires_grad_(True)
         if x.grad is not None:
             x.grad.data.zero_()
-        y = net(x, beta=beta)
+        y = net(x, beta=beta) / (beta + 1)
         x.retain_grad()
         y.sum().backward()
         grad_x = x.grad
@@ -39,7 +43,7 @@ class MALASampler(MCSampler):
         # Hack to keep gradients in control:
         lr = self.lr / max(1, float(grad_x.abs().max()))
 
-        noise_scale = torch.sqrt(torch.as_tensor(lr * 2))
+        noise_scale = torch.sqrt(torch.as_tensor(lr * 2) / (beta + 1))
         x_det = (x - lr * grad_x).detach()
         noise_f = noise_scale * torch.randn_like(x)
         x_ = x_det + noise_f
@@ -51,7 +55,7 @@ class MALASampler(MCSampler):
         x_.requires_grad_(True)
         if x_.grad is not None:
             x_.grad.data.zero_()
-        y_ = net(x_, beta=beta)
+        y_ = net(x_, beta=beta) / (beta + 1)
         y_.sum().backward()
         grad_x_ = x_.grad
 
@@ -98,3 +102,17 @@ class MALASampler(MCSampler):
         """Log any metrics to the tb_logger"""
         logger(mala_lr=self.lr)
         logger(mala_acceptance_ratio=self.acceptance_ratio)
+
+    def state_dict(self) -> dict:
+        """Returns a dictionary of the complete state of the sampler"""
+        return {
+            "lr": self.lr,
+            "beta": self.beta,
+            "acceptance_ratio": self.acceptance_ratio,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Sets the state based on the dict supplied."""
+        self.lr = state["lr"]
+        self.beta = state["beta"]
+        self.acceptance_ratio = state["acceptance_ratio"]

@@ -83,7 +83,7 @@ def setup_mnist(n_hidden=25, prior_scale_factor=5, **kwargs):
 
 def stop_on_low_ais_ess(trial_id, result):
     """Stops trials if the effective sample size falls too low."""
-    return result["ais_effective_sample_size"] < .1
+    return result["ais_effective_sample_size"] < 0.1
 
 
 def stop_on_low_data_erf(trial_id, result):
@@ -93,8 +93,10 @@ def stop_on_low_data_erf(trial_id, result):
 
 def should_stop(*criteria):
     """Helper function to compound multiple criteria"""
+
     def helper(trial_id, result):
         return any(criterion(trial_id, result) for criterion in criteria)
+
     return helper
 
 
@@ -102,25 +104,38 @@ if __name__ == "__main__":
     # Create hyper-parameter optimization client:
     config_space = CS.ConfigurationSpace()
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("lr", lower=1e-5, upper=1e-1, log=True))
+        CS.UniformFloatHyperparameter("lr", lower=1e-5, upper=1e-1, log=True)
+    )
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("prior_scale_factor", lower=1, upper=3, log=True))
+        CS.UniformFloatHyperparameter("prior_scale_factor", lower=1, upper=3, log=True)
+    )
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("sampler_beta_schedule_start", lower=1e-1, upper=.6, log=True))
+        CS.UniformFloatHyperparameter(
+            "sampler_beta_min", lower=1e-1, upper=0.6, log=True
+        )
+    )
     config_space.add_hyperparameter(
-        CS.UniformIntegerHyperparameter("sampler_beta_schedule_num_steps", lower=10, upper=100, log=True))
+        CS.UniformIntegerHyperparameter("num_tempered_transitions", lower=1, upper=10)
+    )
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("sampler_beta_schedule_stop", lower=1e5, upper=1e20, log=True))
+        CS.UniformFloatHyperparameter(
+            "sampler_beta_target", lower=1e5, upper=1e20, log=True
+        )
+    )
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("sampler_lr", lower=1e-4, upper=1e1, log=True))
+        CS.UniformFloatHyperparameter("sampler_lr", lower=1e-4, upper=1e1, log=True)
+    )
     config_space.add_hyperparameter(
-        CS.UniformIntegerHyperparameter("num_mc_steps", lower=50, upper=200, log=True))
+        CS.UniformIntegerHyperparameter("num_mc_steps", lower=50, upper=200, log=True)
+    )
 
     experiment_metrics = dict(metric="loss", mode="min")
     bohb_hyperband = ray.tune.schedulers.HyperBandForBOHB(
-        time_attr="training_iteration", max_t=1000, **experiment_metrics)
+        time_attr="training_iteration", max_t=1000, **experiment_metrics
+    )
     bohb_search = ray.tune.suggest.TuneBOHB(
-        config_space, max_concurrent=4, **experiment_metrics)
+        config_space, max_concurrent=4, **experiment_metrics
+    )
 
     # Run the experiments:
     experiment_name = "digits_bohb_small_zero_lr_low_temp"
@@ -136,11 +151,11 @@ if __name__ == "__main__":
             "batch_size": 1024,
             # "prior_scale_factor": 3,
             "sampler": "langevin",
-            # "sampler_beta_schedule_start": tune.loguniform(1e-1, 0.6),
-            # "sampler_beta_schedule_stop": 10e10, #tune.loguniform(1e-1, 0.6),
+            # "sampler_beta_min": tune.loguniform(1e-1, 0.6),
+            # "sampler_beta_target": 10e10, #tune.loguniform(1e-1, 0.6),
             # "sampler_lr": 1e-2, # tune.loguniform(3e-1, 15),
             # "num_mc_steps": 50, #200//60,
-            "num_sample_mc_steps": 100
+            "num_sample_mc_steps": 100,
         },
         scheduler=bohb_hyperband,
         search_alg=bohb_search,

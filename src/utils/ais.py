@@ -137,3 +137,15 @@ class AISLoss(CheckpointCallback):
         else:
             effective_sample_size = float(num_chains / exp_std.cpu())
         return float(log_w_var), effective_sample_size
+
+    def state_dict(self) -> dict:
+        """Returns a dictionary of the complete state of the ais sampler"""
+        return {
+            "num_interpolants": self.num_interpolants,
+            "sampler_state": self.mc_dynamics.state_dict(),
+        }
+
+    def load_state_dict(self, state: dict):
+        """Sets the state based on the dict supplied."""
+        self.num_interpolants = state["num_interpolants"]
+        self.mc_dynamics.load_state_dict(state["sampler_state"])

@@ -20,7 +20,6 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-@pytest.mark.skip
 def test_save_and_restore(tmp_path):
     """Test that save and restore works."""
     # Setup the trainer.
@@ -43,6 +42,8 @@ def test_save_and_restore(tmp_path):
             list(m.model_samples_), cls=NumpyEncoder
         ),
         "optimizer_": lambda m: json.dumps(m.optimizer_.state_dict(), cls=NumpyEncoder),
+        "sampler_state_": lambda m: m.sampler.state_dict(),
+        "ais_state_": lambda m: m.ais_loss.state_dict(),
     }
     # Store the state;
     original_state = {k: f(trainer) for k, f in attributes_to_check.items()}

@@ -64,19 +64,13 @@ def test_ais_loss(num_features=2, num_samples=200, num_chains=1000, lr=0.1):
     print(mc_loss)
 
     logger = MockLogger()
-    ais_loss_obj = AISLoss(
-        logger=logger,
-        num_chains=N,
-        mc_dynamics=MALASampler(lr=lr),
-    )
+    ais_loss_obj = AISLoss(logger=logger, num_chains=N, mc_dynamics=MALASampler(lr=lr),)
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)
     print(logger.logs["loss_ais"])
 
     ais_loss_obj = AISLoss(
-        logger=logger,
-        num_chains=N,
-        mc_dynamics=LangevinSampler(lr=lr),
+        logger=logger, num_chains=N, mc_dynamics=LangevinSampler(lr=lr),
     )
 
     ais_loss_obj(net=net, global_step=ais_loss_obj.log_z_update_interval, data_sample=X)

@@ -15,9 +15,7 @@ from src import model
 class NormalNet(model.BaseEnergyModel):
     def __init__(self, scale=1):
         num_features = 1
-        super().__init__(
-            input_shape=(num_features,), prior_scale=1
-        )
+        super().__init__(input_shape=(num_features,), prior_scale=1)
         self.scale = scale
 
     def energy(self, x):
@@ -34,9 +32,7 @@ class NormalNet(model.BaseEnergyModel):
 class MixtureNormalNet(model.BaseEnergyModel):
     def __init__(self, locs=(-6, 6), scales=(1, 1)):
         num_features = 1
-        super().__init__(
-            input_shape=(num_features,), prior_scale=10
-        )
+        super().__init__(input_shape=(num_features,), prior_scale=10)
         self.locs = locs
         self.scales = scales
 
@@ -78,7 +74,9 @@ def test_normal_stats(
     samples = []
     x = None
     for _ in range(num_steps):
-        x = net.sample_fantasy(x, num_mc_steps=1, num_samples=num_samples, mc_dynamics=sampler)
+        x = net.sample_fantasy(
+            x, num_mc_steps=1, num_samples=num_samples, mc_dynamics=sampler
+        )
         samples.append(x)
     all_x = torch.stack(samples[num_steps // 2 :])
     mean = torch.mean(all_x)
@@ -134,3 +132,15 @@ def plot_samplers(fsamplers=test_samplers, num_steps=100, net_factory=MixtureNor
     ax[1].plot(x_range, y_range)
     f.legend()
     plt.show()
+
+
+def test_serialization(fsamplers=test_samplers):
+    """Tests serialization and deserialization of samplers"""
+    for name, fsampler in fsamplers.items():
+        sampler = fsampler()
+        state = sampler.state_dict()
+        sampler_new = fsampler()
+        sampler_new.load_state_dict(state)
+        assert (
+            state == sampler_new.state_dict()
+        ), f"{name} state did not seem to serialize correctly"

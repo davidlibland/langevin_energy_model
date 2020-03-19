@@ -64,25 +64,31 @@ def get_energy_trainer(
             self.lr = config.get("lr", 1e-2)
             self.weight_decay = config.get("weight_decay", 1e-1)
             self.num_mc_steps = config.get("num_mc_steps", 1)
+
+            # Reweight number of steps if tempering is used:
+            num_tempered_transitions = config.get("num_tempered_transitions", 1)
+            sampler_beta_schedule_num_steps = max(
+                self.num_mc_steps // num_tempered_transitions, 1
+            )
+            if "tempered" in config.get("sampler", "mala"):
+                self.num_mc_steps = num_tempered_transitions
+
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
             self.sample_beta = config.get("sample_beta", 1)
             self.batch_size = config.get("batch_size", 1024)
             self.sample_size = config.get("sample_size", 30000)
             sampler_lr = config.get("sampler_lr", 0.1)
+            beta_target = config.get("sampler_beta_target", 1.0)
             sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
-                (
-                    "geom",
-                    config.get("sampler_beta_schedule_stop", 1.0),
-                    config.get("sampler_beta_schedule_num_steps", 30),
-                ),
-                start=config.get("sampler_beta_schedule_start", 0.1),
+                ("geom", beta_target, sampler_beta_schedule_num_steps,),
+                start=config.get("sampler_beta_min", 0.1),
             )
             samplers = {
-                "mala": src.mcmc.mala.MALASampler(lr=sampler_lr, logger=self.logger_),
+                "mala": src.mcmc.mala.MALASampler(
+                    lr=sampler_lr, beta=beta_target, logger=self.logger_
+                ),
                 "langevin": src.mcmc.langevin.LangevinSampler(
-                    lr=sampler_lr,
-                    beta_schedule=sampler_beta_schedule,
-                    logger=self.logger_,
+                    lr=sampler_lr, beta=beta_target, logger=self.logger_,
                 ),
                 "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
                     mc_dynamics=src.mcmc.langevin.LangevinSampler(
@@ -132,9 +138,9 @@ def get_energy_trainer(
 
             self.ais_loss = AISLoss(
                 logger=self.logger_,
-                log_z_update_interval=9,
-                max_interpolants=3000,
-                num_interpolants=2000,
+                log_z_update_interval=18,
+                max_interpolants=1500,
+                num_interpolants=500,
             )
             self.step_callbacks = [self.ais_loss]
 
@@ -199,7 +205,9 @@ def get_energy_trainer(
                     "epoch": self.epoch_,
                     "model": self.net_.state_dict(),
                     "optimizer": self.optimizer_.state_dict(),
+                    "sampler_state": self.sampler.state_dict(),
                     "model_samples": list(self.model_samples_),
+                    "ais_state": self.ais_loss.state_dict(),
                 },
                 ckpt_fn,
             )
@@ -213,6 +221,8 @@ def get_energy_trainer(
             self.epoch_ = checkpoint["epoch"]
             self.global_step_ = checkpoint["global_step"]
             self.model_samples_ = deque(checkpoint["model_samples"])
+            self.sampler.load_state_dict(checkpoint["sampler_state"])
+            self.ais_loss.load_state_dict(checkpoint["ais_state"])
 
         def _train(self):
             """Train the model on one epoch"""
@@ -263,10 +273,12 @@ def get_energy_trainer(
                 self.model_samples_.append(model_sample)
 
                 # Sanity checks:
-                assert data_sample.shape[1:] == self.net_.input_shape, \
-                    "Data is incompatible with network."
-                assert model_sample.shape[1:] == data_sample.shape[1:], \
-                    "Model and data samples are incompatible."
+                assert (
+                    data_sample.shape[1:] == self.net_.input_shape
+                ), "Data is incompatible with network."
+                assert (
+                    model_sample.shape[1:] == data_sample.shape[1:]
+                ), "Model and data samples are incompatible."
 
                 # Forward gradient:
                 self.net_.train()
@@ -277,7 +289,9 @@ def get_energy_trainer(
 
                 # Estimate the odds of the data's energy based on a normal fitted to
                 # model samples:
-                data_erf = torch.erf((data_energy_mean-model_energy_mean)/model_energy.std())
+                data_erf = torch.erf(
+                    (data_energy_mean - model_energy_mean) / model_energy.std()
+                )
 
                 objective = data_energy_mean - model_energy_mean
                 objective.backward()
@@ -305,12 +319,8 @@ def get_energy_trainer(
                     print(
                         f"on epoch {self.epoch_}, batch {i_batch}, data erf: {data_erf}, objective: {objective}"
                     )
-                    print(
-                        f"model energy: {model_energy_mean} +- {model_energy.std()}"
-                    )
-                    print(
-                        f"data energy: {data_energy_mean}"
-                    )
+                    print(f"model energy: {model_energy_mean} +- {model_energy.std()}")
+                    print(f"data energy: {data_energy_mean}")
                     print(
                         f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s"
                     )
@@ -320,7 +330,9 @@ def get_energy_trainer(
                 for k, v in means.items():
                     print(f"{k}: {v}")
             self.logger_.flush()
-            means["loss"] = src.utils.constraints.add_soft_constraint(means["loss_ais"], means["data_erf"], lower_bound=-1)
+            means["loss"] = src.utils.constraints.add_soft_constraint(
+                means["loss_ais"], means["data_erf"], lower_bound=-1
+            )
             return means
 
         def _save(self, tmp_checkpoint_dir):

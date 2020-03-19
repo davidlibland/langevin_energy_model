@@ -76,3 +76,15 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         avg_distance = src.utils.math.avg_norm(result - x)
         self.logger(tempered_avg_sample_distance=float(avg_distance))
         return result
+
+    def state_dict(self) -> dict:
+        """Returns a dictionary of the complete state of the sampler"""
+        return {
+            "transition_state": self.mc_dynamics.state_dict(),
+            "beta_schedule": self.beta_schedule,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Sets the state based on the dict supplied."""
+        self.beta_schedule = state["beta_schedule"]
+        self.mc_dynamics.load_state_dict(state["transition_state"])
