@@ -137,23 +137,16 @@ if __name__ == "__main__":
     )
 
     # Run the experiments:
-    experiment_name = "digits_bohb_small_zero_lr_low_temp"
+    experiment_name = "digits_bohb"
     analysis = tune.run(
         get_energy_trainer(setup_digits),
         name=experiment_name,
         config={
-            # "lr": tune.loguniform(1e-5, 1e-4),
-            # "lr": .1,
             "weight_decay": 0,
             "n_hidden": 64,
             "model": "conv",
             "batch_size": 1024,
-            # "prior_scale_factor": 3,
             "sampler": "langevin",
-            # "sampler_beta_min": tune.loguniform(1e-1, 0.6),
-            # "sampler_beta_target": 10e10, #tune.loguniform(1e-1, 0.6),
-            # "sampler_lr": 1e-2, # tune.loguniform(3e-1, 15),
-            # "num_mc_steps": 50, #200//60,
             "num_sample_mc_steps": 100,
         },
         scheduler=bohb_hyperband,
@@ -163,6 +156,7 @@ if __name__ == "__main__":
         checkpoint_freq=10,
         checkpoint_at_end=True,
         stop=should_stop(stop_on_low_ais_ess, stop_on_low_data_erf),
+        reuse_actors=True,
         # resources_per_trial={"gpu": 1},
         # resume="PROMPT"
         # restore="/Users/dlibland/ray_results/sm_digit_fives_/EnergyTrainer_0_model=resnet,sampler=mala_2020-02-24_09-39-38fnpaf60f/checkpoint_104"
