@@ -140,6 +140,7 @@ def get_energy_trainer(
 
             self.ais_loss = AISLoss(
                 logger=self.logger_,
+                num_chains=config.get("ais_num_chains", 100),
                 log_z_update_interval=config.get("ais_update_interval", 32),
                 max_interpolants=config.get("ais_max_interpolants", 5000),
                 num_interpolants=config.get("ais_num_interpolants", 500),
