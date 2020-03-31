@@ -103,30 +103,34 @@ if __name__ == "__main__":
     # Create hyper-parameter optimization client:
     config_space = CS.ConfigurationSpace()
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("lr", lower=1e-5, upper=1e-1, log=True)
+        CS.UniformFloatHyperparameter("lr", lower=1e-6, upper=1e-3, log=True)
+    )
+    # Unused for mnist:
+    # config_space.add_hyperparameter(
+    #     CS.UniformFloatHyperparameter("prior_scale_factor", lower=1, upper=3, log=True)
+    # )
+    config_space.add_hyperparameter(
+        CS.UniformFloatHyperparameter("sampler_lr", lower=1e-5, upper=1e-1, log=True)
     )
     config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("prior_scale_factor", lower=1, upper=3, log=True)
+        CS.UniformIntegerHyperparameter("num_mc_steps", lower=200, upper=1000, log=True)
     )
     config_space.add_hyperparameter(
         CS.UniformFloatHyperparameter(
-            "sampler_beta_min", lower=1e-1, upper=0.6, log=True
+            "sampler_beta_target", lower=1e5, upper=1e10, log=True
         )
     )
-    config_space.add_hyperparameter(
-        CS.UniformIntegerHyperparameter("num_tempered_transitions", lower=1, upper=10)
-    )
-    config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter(
-            "sampler_beta_target", lower=1e5, upper=1e20, log=True
-        )
-    )
-    config_space.add_hyperparameter(
-        CS.UniformFloatHyperparameter("sampler_lr", lower=1e-4, upper=1e1, log=True)
-    )
-    config_space.add_hyperparameter(
-        CS.UniformIntegerHyperparameter("num_mc_steps", lower=50, upper=200, log=True)
-    )
+
+    # The following are only used for tempered transitions:
+
+    # config_space.add_hyperparameter(
+    #     CS.UniformFloatHyperparameter(
+    #         "sampler_beta_min", lower=1e-1, upper=0.6, log=True
+    #     )
+    # )
+    # config_space.add_hyperparameter(
+    #     CS.UniformIntegerHyperparameter("num_tempered_transitions", lower=1, upper=10)
+    # )
 
     experiment_metrics = dict(metric="loss", mode="min")
     bohb_hyperband = ray.tune.schedulers.HyperBandForBOHB(
@@ -137,17 +141,20 @@ if __name__ == "__main__":
     )
 
     # Run the experiments:
-    experiment_name = "digits_bohb"
+    experiment_name = "mnist_bohb"
     analysis = tune.run(
-        get_energy_trainer(setup_digits),
+        get_energy_trainer(setup_mnist),
         name=experiment_name,
         config={
+            "ais_update_interval": 18,
+            "ais_max_interpolants": 5000,
+            "ais_num_interpolants": 500,
             "weight_decay": 0,
             "n_hidden": 64,
-            "model": "conv",
+            "model": ["conv", "resnet"],
             "batch_size": 1024,
             "sampler": "langevin",
-            "num_sample_mc_steps": 100,
+            "num_sample_mc_steps": 10000,
         },
         scheduler=bohb_hyperband,
         search_alg=bohb_search,
@@ -157,7 +164,7 @@ if __name__ == "__main__":
         checkpoint_at_end=True,
         stop=should_stop(stop_on_low_ais_ess, stop_on_low_data_erf),
         reuse_actors=True,
-        # resources_per_trial={"gpu": 1},
+        resources_per_trial={"gpu": 1},
         # resume="PROMPT"
         # restore="/Users/dlibland/ray_results/sm_digit_fives_/EnergyTrainer_0_model=resnet,sampler=mala_2020-02-24_09-39-38fnpaf60f/checkpoint_104"
     )

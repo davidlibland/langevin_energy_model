@@ -23,7 +23,6 @@ from src import model
 from src.distributions import core
 from src.utils.ais import AISLoss
 
-# Globals (make these configurable)
 
 MAX_REPLAY = 0
 REPLAY_PROB = 0.99
@@ -138,11 +137,15 @@ def get_energy_trainer(
 
             self.ais_loss = AISLoss(
                 logger=self.logger_,
-                log_z_update_interval=18,
-                max_interpolants=1500,
-                num_interpolants=500,
+                log_z_update_interval=config.get("ais_update_interval", 32),
+                max_interpolants=config.get("ais_max_interpolants", 5000),
+                num_interpolants=config.get("ais_num_interpolants", 500),
             )
             self.step_callbacks = [self.ais_loss]
+
+            # Add replay buffer config:
+            self.max_replay = config.get("max_replay", MAX_REPLAY)
+            self.replay_prob = config.get("replay_prob", REPLAY_PROB)
 
         def get_data_and_model_samples(self):
             """Get a batch of data and model samples."""
@@ -208,6 +211,8 @@ def get_energy_trainer(
                     "sampler_state": self.sampler.state_dict(),
                     "model_samples": list(self.model_samples_),
                     "ais_state": self.ais_loss.state_dict(),
+                    "replay_prob": self.replay_prob,
+                    "max_replay": self.max_replay,
                 },
                 ckpt_fn,
             )
@@ -223,6 +228,8 @@ def get_energy_trainer(
             self.model_samples_ = deque(checkpoint["model_samples"])
             self.sampler.load_state_dict(checkpoint["sampler_state"])
             self.ais_loss.load_state_dict(checkpoint["ais_state"])
+            self.replay_prob = checkpoint["replay_prob"]
+            self.max_replay = checkpoint["max_replay"]
 
         def _train(self):
             """Train the model on one epoch"""
@@ -243,7 +250,7 @@ def get_energy_trainer(
                             ).detach()
                         ]
                     )
-                elif len(self.model_samples_) > MAX_REPLAY:
+                elif len(self.model_samples_) > self.max_replay:
                     self.model_samples_.popleft()
                 replay_sample = random.choices(
                     self.model_samples_,
@@ -253,7 +260,7 @@ def get_energy_trainer(
                 noise_sample = self.net_.sample_from_prior(
                     replay_sample.shape[0], device=self.device
                 )
-                mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
+                mask = torch.rand(replay_sample.shape[0]) < self.replay_prob
                 while len(mask.shape) < len(replay_sample.shape):
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
