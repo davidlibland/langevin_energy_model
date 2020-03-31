@@ -163,7 +163,7 @@ if __name__ == "__main__":
         checkpoint_freq=10,
         checkpoint_at_end=True,
         stop=should_stop(stop_on_low_ais_ess, stop_on_low_data_erf),
-        reuse_actors=True,
+        # reuse_actors=True,
         resources_per_trial={"gpu": 1},
         # resume="PROMPT"
         # restore="/Users/dlibland/ray_results/sm_digit_fives_/EnergyTrainer_0_model=resnet,sampler=mala_2020-02-24_09-39-38fnpaf60f/checkpoint_104"
