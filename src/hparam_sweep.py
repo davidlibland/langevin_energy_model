@@ -24,6 +24,9 @@ from src.distributions import core
 from src.utils.ais import AISLoss
 
 
+plt.switch_backend("agg")
+
+
 MAX_REPLAY = 0
 REPLAY_PROB = 0.99
 

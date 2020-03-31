@@ -2,13 +2,16 @@ from math import sqrt
 from typing import Tuple, TYPE_CHECKING
 
 import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from toolz import curry
 
 if TYPE_CHECKING:
     from src.distributions.core import Distribution
+
+
+plt.switch_backend("agg")
 
 
 def train_gmm_pca_model(

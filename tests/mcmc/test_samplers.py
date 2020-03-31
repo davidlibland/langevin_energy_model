@@ -12,6 +12,9 @@ import src.mcmc.tempered_transitions
 from src import model
 
 
+plt.switch_backend("agg")
+
+
 class NormalNet(model.BaseEnergyModel):
     def __init__(self, scale=1):
         num_features = 1

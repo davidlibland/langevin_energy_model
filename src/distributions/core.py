@@ -10,6 +10,9 @@ import numpy as np
 from scipy.special import logsumexp
 from sklearn.mixture import GaussianMixture
 
+plt.switch_backend("agg")
+
+
 from src.distributions.utils import get_samples
 
 
