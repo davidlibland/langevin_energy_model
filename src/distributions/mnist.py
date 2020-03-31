@@ -17,7 +17,10 @@ def get_mnist_distribution() -> Sampler:
     """
     X, y = fetch_openml("mnist_784", version=1, return_X_y=True)
     X = 2 * X.astype(np.float) / X.max() - 1
-    mnist_dist = Sampler.from_samples(X, noise=lambda shape: 2 * np.random.rand(*shape)/255)
+    X = X.reshape([-1, 1, 28, 28])
+    mnist_dist = Sampler.from_samples(
+        X, noise=lambda shape: 2 * np.random.rand(*shape) / 255
+    )
     mnist_dist.visualize = plot_image_samples([28, 28], False)
     return mnist_dist
 

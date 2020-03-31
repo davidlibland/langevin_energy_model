@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.mcmc.abstract import MCSampler
-from src.mcmc.mala import MALASampler
 from src.utils.resnet import BasicBlock as BasicResnetBlock
 from src.utils.math import swish
 
@@ -14,23 +13,20 @@ LANG_INIT_NS = 1
 
 
 class BaseEnergyModel(nn.Module):
-    def __init__(
-        self, num_features, prior_scale=LANG_INIT_NS, grad_max=100, mc_dynamics=None
-    ):
+    def __init__(self, input_shape, prior_scale=LANG_INIT_NS, grad_max=100):
         super().__init__()
         self.prior_scale = prior_scale
         self.grad_max = grad_max
-        self.num_features = num_features
-        self._log_z_prior = self.num_features * (
+        self.input_shape = input_shape
+        self.feature_dims = tuple(range(1, 1 + len(self.input_shape)))
+        num_features = np.prod(input_shape)
+        self._log_z_prior = num_features * (
             0.5 * np.log(2 * np.pi) + np.log(prior_scale)
         )
-        if mc_dynamics is None:
-            mc_dynamics = MALASampler(lr=0.1)
-        self.sampler = mc_dynamics
 
     def sample_from_prior(self, size: int, device=None):
         """Returns samples from the prior."""
-        return torch.randn(size, self.num_features, device=device) * self.prior_scale
+        return torch.randn(size, *self.input_shape, device=device) * self.prior_scale
 
     def sample_fantasy(
         self,
@@ -39,7 +35,7 @@ class BaseEnergyModel(nn.Module):
         beta=None,
         num_samples=None,
         mc_dynamics: MCSampler = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Sample fantasy particles.
@@ -52,7 +48,7 @@ class BaseEnergyModel(nn.Module):
                 Must be a float or broadcastable to x. Defaults to 1.
             num_samples: If x is not provided, this many samples will be taken
                 from the prior.
-            mc_dynamics: The type of dynamincs to use. Defaults to langevin.
+            mc_dynamics: The type of dynamincs to use.
 
         Returns:
             Samples.
@@ -63,7 +59,7 @@ class BaseEnergyModel(nn.Module):
             )
             x = self.sample_from_prior(num_samples)
         if mc_dynamics is None:
-            mc_dynamics = self.sampler
+            raise ValueError("mc_dynamics must be provided.")
         for _ in range(num_mc_steps):
             x = mc_dynamics(self, x, beta=beta)
         return x
@@ -76,8 +72,13 @@ class BaseEnergyModel(nn.Module):
         """A default forward call which incorporates the inverse temperature
         and prior."""
         x = input[0]
+        if tuple(x.shape)[1:] != tuple(self.input_shape):
+            raise ValueError(
+                f"Shape mismatch: input of shape {x.shape} did not "
+                f"match expected shape: {('-',) + self.input_shape}"
+            )
         prior_energy = (
-            torch.sum(((x / self.prior_scale) ** 2) / 2, dim=1, keepdim=True)
+            torch.sum(((x / self.prior_scale) ** 2) / 2, dim=self.feature_dims)
             + self._log_z_prior
         )
         h = self.energy(x)
@@ -91,7 +92,7 @@ class BaseEnergyModel(nn.Module):
 
 class SimpleEnergyModel(BaseEnergyModel):
     def __init__(self, num_inputs, num_layers, num_units, prior_scale=LANG_INIT_NS):
-        super().__init__(num_features=num_inputs, prior_scale=prior_scale)
+        super().__init__(input_shape=(num_inputs,), prior_scale=prior_scale)
         input_layer = nn.utils.spectral_norm(nn.Linear(num_inputs, num_units))
         self.internal_layers = nn.ModuleList([input_layer])
         for _ in range(num_layers - 2):
@@ -106,7 +107,7 @@ class SimpleEnergyModel(BaseEnergyModel):
             x = layer(x)
             x = F.leaky_relu(x)
         x = self.internal_layers[-1](x)
-        return x
+        return x.squeeze(-1)
 
 
 class ConvEnergyModel(BaseEnergyModel):
@@ -114,11 +115,22 @@ class ConvEnergyModel(BaseEnergyModel):
         self, input_shape, num_layers=3, num_units=25, prior_scale=LANG_INIT_NS
     ):
         c, h, w = input_shape
-        num_features = c * h * w
-        super().__init__(num_features=num_features, prior_scale=prior_scale)
+        super().__init__(input_shape=input_shape, prior_scale=prior_scale)
         self.input_shape = input_shape
-        self.internal_layers = nn.ModuleList()
-        in_channels = c
+        self.internal_layers = nn.ModuleList(
+            [
+                nn.utils.spectral_norm(
+                    nn.Conv2d(
+                        in_channels=c,
+                        out_channels=num_units,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    )
+                )  # adding this helps to eliminate checkerboard patterns
+            ]
+        )
+        in_channels = num_units
         kernel_size = (3, 3)
         for _ in range(num_layers - 1):
             layer = nn.utils.spectral_norm(
@@ -145,7 +157,7 @@ class ConvEnergyModel(BaseEnergyModel):
             x = F.leaky_relu(x)
         x = torch.reshape(x, (n, self.dense_size))
         x = self.internal_layers[-1](x)
-        return x
+        return x.squeeze(-1)
 
 
 class ResnetEnergyModel(BaseEnergyModel):
@@ -158,11 +170,22 @@ class ResnetEnergyModel(BaseEnergyModel):
         prior_scale=LANG_INIT_NS,
     ):
         c, h, w = input_shape
-        num_features = c * h * w
-        super().__init__(num_features=num_features, prior_scale=prior_scale)
+        super().__init__(input_shape=input_shape, prior_scale=prior_scale)
         self.input_shape = input_shape
-        self.internal_layers = nn.ModuleList()
-        in_channels = c + 1
+        self.internal_layers = nn.ModuleList(
+            [
+                nn.utils.spectral_norm(
+                    nn.Conv2d(
+                        in_channels=c + 1,
+                        out_channels=num_units,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    )
+                )  # adding this helps to eliminate checkerboard patterns
+            ]
+        )
+        in_channels = num_units
         # kernel_size = (3, 3)
         for _ in range(num_layers - 1):
             for _ in range(num_resnets):
@@ -204,12 +227,12 @@ class ResnetEnergyModel(BaseEnergyModel):
     def energy(self, x):
         n = x.shape[0]
         x = torch.reshape(x, (n,) + self.input_shape)
-        ones = torch.ones_like(x)
+        _, h, w = self.input_shape
+        ones = torch.ones((n, 1, h, w)).to(x.device)
         x = torch.cat([ones, x], dim=1)  # add a channel of 1s to distinguish padding.
         for layer in self.internal_layers[:-1]:
             x = layer(x)
-            # ToDo: Consider changing this to swish:
-            x = F.leaky_relu(x)
+            x = swish(x)
         x = torch.sum(x, dim=[2, 3])  # spatial sum
         x = self.internal_layers[-1](x)
-        return x
+        return x.squeeze(-1)

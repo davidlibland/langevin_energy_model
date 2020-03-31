@@ -19,9 +19,11 @@ def get_sm_digit_distribution() -> Sampler:
     X, y = load_digits(return_X_y=True)
     X = 2 * X.astype(np.float) / X.max() - 1
     n = X.shape[0]
-    X_torch = torch.tensor(X.reshape([n, 8, 8]))
+    X_torch = torch.tensor(X.reshape([n, 1, 8, 8]))
     X = torch.nn.AvgPool2d(kernel_size=(2, 2))(X_torch).numpy()
-    digit_dist = Sampler.from_samples(X, noise=lambda shape: 2*np.random.rand(*shape)/255)
+    digit_dist = Sampler.from_samples(
+        X, noise=lambda shape: 2 * np.random.rand(*shape) / 255
+    )
     digit_dist.visualize = plot_image_samples([4, 4], False)
     return digit_dist
 

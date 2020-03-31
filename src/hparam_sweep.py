@@ -18,14 +18,14 @@ import src.mcmc.mala
 import src.mcmc.tempered_transitions
 import src.utils.ais
 import src.utils.beta_schedules
+import src.utils.constraints
 from src import model
 from src.distributions import core
 from src.utils.ais import AISLoss
 
-# Globals (make these configurable)
 
-MAX_REPLAY = 100
-REPLAY_PROB = 0.95
+MAX_REPLAY = 0
+REPLAY_PROB = 0.99
 
 
 class Logger:
@@ -63,27 +63,45 @@ def get_energy_trainer(
             self.lr = config.get("lr", 1e-2)
             self.weight_decay = config.get("weight_decay", 1e-1)
             self.num_mc_steps = config.get("num_mc_steps", 1)
+
+            # Reweight number of steps if tempering is used:
+            num_tempered_transitions = config.get("num_tempered_transitions", 1)
+            sampler_beta_schedule_num_steps = max(
+                self.num_mc_steps // num_tempered_transitions, 1
+            )
+            if "tempered" in config.get("sampler", "mala"):
+                self.num_mc_steps = num_tempered_transitions
+
             self.num_sample_mc_steps = config.get("num_sample_mc_steps", 1000)
             self.sample_beta = config.get("sample_beta", 1)
             self.batch_size = config.get("batch_size", 1024)
-            self.sample_size = config.get("sample_size", 10000)
+            self.sample_size = config.get("sample_size", 30000)
             sampler_lr = config.get("sampler_lr", 0.1)
+            beta_target = config.get("sampler_beta_target", 1.0)
             sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("geom", 1.0, config.get("sampler_beta_schedule_num_steps", 30)),
-                start=config.get("sampler_beta_schedule_start", 0.1),
+                ("geom", beta_target, sampler_beta_schedule_num_steps,),
+                start=config.get("sampler_beta_min", 0.1),
             )
             samplers = {
-                "mala": src.mcmc.mala.MALASampler(lr=sampler_lr, logger=self.logger_),
-                "langevin": src.mcmc.langevin.LangevinSampler(lr=sampler_lr, logger=self.logger_),
+                "mala": src.mcmc.mala.MALASampler(
+                    lr=sampler_lr, beta=beta_target, logger=self.logger_
+                ),
+                "langevin": src.mcmc.langevin.LangevinSampler(
+                    lr=sampler_lr, beta=beta_target, logger=self.logger_,
+                ),
                 "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.langevin.LangevinSampler(lr=sampler_lr, logger=self.logger_),
+                    mc_dynamics=src.mcmc.langevin.LangevinSampler(
+                        lr=sampler_lr, logger=self.logger_
+                    ),
                     beta_schedule=sampler_beta_schedule,
-                    logger=self.logger_
+                    logger=self.logger_,
                 ),
                 "tempered mala": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.mala.MALASampler(lr=sampler_lr, logger=self.logger_),
+                    mc_dynamics=src.mcmc.mala.MALASampler(
+                        lr=sampler_lr, logger=self.logger_
+                    ),
                     beta_schedule=sampler_beta_schedule,
-                    logger=self.logger_
+                    logger=self.logger_,
                 ),
             }
             self.sampler = samplers.get(config.get("sampler", "mala"))
@@ -94,7 +112,10 @@ def get_energy_trainer(
             print(self.samples.shape)
             dataset = data.TensorDataset(torch.tensor(self.samples, dtype=torch.float))
             self.energy = (
-                lambda x: self.net_(torch.tensor(x, dtype=torch.float)).detach().numpy()
+                lambda x: self.net_(torch.tensor(x, dtype=torch.float).to(self.device))
+                .detach()
+                .cpu()
+                .numpy()
             )
             self.optimizer_ = optim.Adam(
                 self.net_.parameters(), lr=self.lr, weight_decay=self.weight_decay
@@ -114,8 +135,17 @@ def get_energy_trainer(
             self.epoch_ = 0
             self.model_samples_ = None
 
-            self.ais_loss = AISLoss(logger=self.logger_, log_z_update_interval=9)
+            self.ais_loss = AISLoss(
+                logger=self.logger_,
+                log_z_update_interval=config.get("ais_update_interval", 32),
+                max_interpolants=config.get("ais_max_interpolants", 5000),
+                num_interpolants=config.get("ais_num_interpolants", 500),
+            )
             self.step_callbacks = [self.ais_loss]
+
+            # Add replay buffer config:
+            self.max_replay = config.get("max_replay", MAX_REPLAY)
+            self.replay_prob = config.get("replay_prob", REPLAY_PROB)
 
         def get_data_and_model_samples(self):
             """Get a batch of data and model samples."""
@@ -163,7 +193,7 @@ def get_energy_trainer(
             fig.clear()
             ax = fig.subplots(1, 1)
             ax.hist(energies, density=True, label=["data", "model"])
-            ax.legend(prop={'size': 10})
+            ax.legend(prop={"size": 10})
 
             plot_fn = os.path.join(dir, f"energies_{label}.png")
             fig.savefig(plot_fn)
@@ -178,7 +208,11 @@ def get_energy_trainer(
                     "epoch": self.epoch_,
                     "model": self.net_.state_dict(),
                     "optimizer": self.optimizer_.state_dict(),
+                    "sampler_state": self.sampler.state_dict(),
                     "model_samples": list(self.model_samples_),
+                    "ais_state": self.ais_loss.state_dict(),
+                    "replay_prob": self.replay_prob,
+                    "max_replay": self.max_replay,
                 },
                 ckpt_fn,
             )
@@ -192,6 +226,10 @@ def get_energy_trainer(
             self.epoch_ = checkpoint["epoch"]
             self.global_step_ = checkpoint["global_step"]
             self.model_samples_ = deque(checkpoint["model_samples"])
+            self.sampler.load_state_dict(checkpoint["sampler_state"])
+            self.ais_loss.load_state_dict(checkpoint["ais_state"])
+            self.replay_prob = checkpoint["replay_prob"]
+            self.max_replay = checkpoint["max_replay"]
 
         def _train(self):
             """Train the model on one epoch"""
@@ -212,7 +250,7 @@ def get_energy_trainer(
                             ).detach()
                         ]
                     )
-                elif len(self.model_samples_) > MAX_REPLAY:
+                elif len(self.model_samples_) > self.max_replay:
                     self.model_samples_.popleft()
                 replay_sample = random.choices(
                     self.model_samples_,
@@ -222,15 +260,17 @@ def get_energy_trainer(
                 noise_sample = self.net_.sample_from_prior(
                     replay_sample.shape[0], device=self.device
                 )
-                mask = torch.rand(replay_sample.shape[0]) < REPLAY_PROB
+                mask = torch.rand(replay_sample.shape[0]) < self.replay_prob
                 while len(mask.shape) < len(replay_sample.shape):
                     # Add extra feature-dims
                     mask.unsqueeze_(dim=-1)
+
                 model_sample = torch.where(
                     mask.to(self.device), replay_sample, noise_sample
                 )
 
                 self.net_.eval()
+                # Run at least one iteration
                 model_sample = self.net_.sample_fantasy(
                     model_sample,
                     num_mc_steps=self.num_mc_steps,
@@ -239,12 +279,28 @@ def get_energy_trainer(
 
                 self.model_samples_.append(model_sample)
 
+                # Sanity checks:
+                assert (
+                    data_sample.shape[1:] == self.net_.input_shape
+                ), "Data is incompatible with network."
+                assert (
+                    model_sample.shape[1:] == data_sample.shape[1:]
+                ), "Model and data samples are incompatible."
+
                 # Forward gradient:
                 self.net_.train()
                 self.net_.zero_grad()
-                objective = (
-                    self.net_(data_sample).mean() - self.net_(model_sample).mean()
+                data_energy_mean = self.net_(data_sample).mean()
+                model_energy = self.net_(model_sample)
+                model_energy_mean = model_energy.mean()
+
+                # Estimate the odds of the data's energy based on a normal fitted to
+                # model samples:
+                data_erf = torch.erf(
+                    (data_energy_mean - model_energy_mean) / model_energy.std()
                 )
+
+                objective = data_energy_mean - model_energy_mean
                 objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_value_(self.net_.parameters(), 1e2)
                 self.optimizer_.step()
@@ -252,6 +308,7 @@ def get_energy_trainer(
                 batch_training_time = time.time() - batch_start_time
                 epoch_training_time += batch_training_time
                 self.logger_(energy_diff=float(objective))
+                self.logger_(data_erf=float(data_erf))
 
                 tr_metrics_start_time = time.time()
                 for callback in self.step_callbacks:
@@ -267,8 +324,10 @@ def get_energy_trainer(
                 epoch_metrics_time += tr_metrics_time
                 if self.verbose:
                     print(
-                        f"on epoch {self.epoch_}, batch {i_batch}, objective: {objective}"
+                        f"on epoch {self.epoch_}, batch {i_batch}, data erf: {data_erf}, objective: {objective}"
                     )
+                    print(f"model energy: {model_energy_mean} +- {model_energy.std()}")
+                    print(f"data energy: {data_energy_mean}")
                     print(
                         f"training time: {batch_training_time:0.3f}s, metrics time: {tr_metrics_time:0.3f}s"
                     )
@@ -278,6 +337,9 @@ def get_energy_trainer(
                 for k, v in means.items():
                     print(f"{k}: {v}")
             self.logger_.flush()
+            means["loss"] = src.utils.constraints.add_soft_constraint(
+                means["loss_ais"], means["data_erf"], lower_bound=-1
+            )
             return means
 
         def _save(self, tmp_checkpoint_dir):
@@ -285,10 +347,19 @@ def get_energy_trainer(
             neg_samples = self.model_samples_[-1].detach().cpu().numpy()
             data_samples, model_samples = self.get_data_and_model_samples()
             self.save_images(model_samples, dir=tmp_checkpoint_dir)
-            self.save_images(neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
-            self.save_images(data_samples, dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}")
+            self.save_images(
+                neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}"
+            )
+            self.save_images(
+                data_samples, dir=tmp_checkpoint_dir, label=f"_data_{self.global_step_}"
+            )
             self.save_energy_plot(data_samples, model_samples, dir=tmp_checkpoint_dir)
-            self.save_energy_plot(data_samples, neg_samples, dir=tmp_checkpoint_dir, label=f"_neg_{self.global_step_}")
+            self.save_energy_plot(
+                data_samples,
+                neg_samples,
+                dir=tmp_checkpoint_dir,
+                label=f"_neg_{self.global_step_}",
+            )
             self.save_model(dir=tmp_checkpoint_dir)
             return tmp_checkpoint_dir
 

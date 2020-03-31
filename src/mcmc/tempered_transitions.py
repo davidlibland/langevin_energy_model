@@ -11,10 +11,15 @@ if TYPE_CHECKING:
 
 
 class TemperedTransitions(src.mcmc.abstract.MCSampler):
-    def __init__(self, mc_dynamics: src.mcmc.abstract.MCSampler, beta_schedule=None, logger: Callable=None):
+    def __init__(
+        self,
+        mc_dynamics: src.mcmc.abstract.MCSampler,
+        beta_schedule=None,
+        logger: Callable = None,
+    ):
         if beta_schedule is None:
             beta_schedule = src.utils.beta_schedules.build_schedule(
-                ("geom", 1.0, 30), start=0.1
+                ("geom", 1.0, 30), start=0.1,
             )
         self.beta_schedule = beta_schedule
         self.mc_dynamics = mc_dynamics
@@ -60,11 +65,26 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         log_alpha -= net(current_samples, beta=self.beta_schedule[-1]).detach()
 
         alpha = torch.exp(torch.clamp_max(log_alpha, 0))
-        mask = torch.rand(x.shape[0], 1, device=alpha.device) < alpha
+        mask = torch.rand(x.shape[0], device=alpha.device) < alpha
 
+        while len(mask.shape) < len(x.shape):
+            # Add extra feature-dims
+            mask.unsqueeze_(dim=-1)
         acceptance_ratio = torch.mean(mask.float()).float()
         self.logger(tempered_acceptance_ratio=float(acceptance_ratio))
         result = torch.where(mask, current_samples, x).detach()
         avg_distance = src.utils.math.avg_norm(result - x)
         self.logger(tempered_avg_sample_distance=float(avg_distance))
         return result
+
+    def state_dict(self) -> dict:
+        """Returns a dictionary of the complete state of the sampler"""
+        return {
+            "transition_state": self.mc_dynamics.state_dict(),
+            "beta_schedule": self.beta_schedule,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Sets the state based on the dict supplied."""
+        self.beta_schedule = state["beta_schedule"]
+        self.mc_dynamics.load_state_dict(state["transition_state"])

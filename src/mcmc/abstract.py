@@ -18,3 +18,11 @@ class MCSampler:
     def log_metrics(self, logger, global_step: int, **kwargs):
         """Log any metrics to the tb_logger"""
         pass
+
+    def state_dict(self) -> dict:
+        """Returns a dictionary of the complete state of the sampler"""
+        return {}
+
+    def load_state_dict(self, state: dict):
+        """Sets the state based on the dict supplied."""
+        pass

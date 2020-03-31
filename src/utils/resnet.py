@@ -48,10 +48,7 @@ class BasicBlock(nn.Module):
         if stride != 1 or in_channels != out_channels:
             downsample = conv_mod(conv1x1(in_channels, out_channels, stride))
             if norm_layer is not None:
-                downsample = nn.Sequential(
-                    downsample,
-                    norm_layer(out_channels),
-                )
+                downsample = nn.Sequential(downsample, norm_layer(out_channels),)
         if norm_layer is None:
             norm_layer = lambda _: identity
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
