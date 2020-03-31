@@ -154,7 +154,7 @@ if __name__ == "__main__":
             "model": ["conv", "resnet"],
             "batch_size": 1024,
             "sampler": "langevin",
-            "num_sample_mc_steps": 10000,
+            "num_sample_mc_steps": 1500,
         },
         scheduler=bohb_hyperband,
         search_alg=bohb_search,
