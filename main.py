@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
     experiment_metrics = dict(metric="loss", mode="min")
     bohb_hyperband = ray.tune.schedulers.HyperBandForBOHB(
-        time_attr="training_iteration", max_t=1000, **experiment_metrics
+        time_attr="training_iteration", max_t=3, **experiment_metrics
     )
     bohb_search = ray.tune.suggest.TuneBOHB(
         config_space, max_concurrent=4, **experiment_metrics
@@ -146,15 +146,15 @@ if __name__ == "__main__":
         get_energy_trainer(setup_mnist),
         name=experiment_name,
         config={
-            "ais_update_interval": 18,
-            "ais_max_interpolants": 5000,
-            "ais_num_interpolants": 500,
+            "ais_update_interval": 90,
+            "ais_max_interpolants": 500,
+            "ais_num_interpolants": 1500,
             "weight_decay": 0,
-            "n_hidden": 64,
-            "model": ["conv", "resnet"],
+            "n_hidden": 32,
+            "model": ["resnet"],
             "batch_size": 1024,
             "sampler": "langevin",
-            "num_sample_mc_steps": 1500,
+            "num_sample_mc_steps": 100,
         },
         scheduler=bohb_hyperband,
         search_alg=bohb_search,
