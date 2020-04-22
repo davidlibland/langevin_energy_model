@@ -220,10 +220,10 @@ def get_energy_trainer(
                 },
                 ckpt_fn,
             )
+            return ckpt_fn
 
-        def load_model(self, dir=""):
+        def load_model(self, ckpt_fn):
             """Loads the model from the specified dir."""
-            ckpt_fn = os.path.join(dir, f"model.pkl")
             checkpoint = torch.load(ckpt_fn)
             self.net_.load_state_dict(checkpoint["model"])
             self.optimizer_.load_state_dict(checkpoint["optimizer"])
@@ -364,8 +364,8 @@ def get_energy_trainer(
                 dir=tmp_checkpoint_dir,
                 label=f"_neg_{self.global_step_}",
             )
-            self.save_model(dir=tmp_checkpoint_dir)
-            return tmp_checkpoint_dir
+            ckpt_fn = self.save_model(dir=tmp_checkpoint_dir)
+            return ckpt_fn
 
         def _restore(self, checkpoint):
             """Restore the model"""

@@ -1,6 +1,7 @@
 # content of test_tmp_path.py
 import json
 import numbers
+import os
 
 import numpy as np
 import torch
@@ -34,8 +35,8 @@ def test_save_and_restore(tmp_path):
     # run one training step
     trainer.train()
     # save it.
-    save_dir = trainer._save(tmp_checkpoint_dir=str(tmp_path))
-    assert save_dir == str(tmp_path), "The model should be saved at the given path."
+    ckpt_fn = trainer._save(tmp_checkpoint_dir=str(tmp_path))
+    assert os.path.dirname(ckpt_fn) == str(tmp_path), "The model should be saved at the given path."
     attributes_to_check = {
         "global_step_": lambda m: m.global_step_,
         "epoch_": lambda m: m.epoch_,
@@ -65,8 +66,22 @@ def test_save_and_restore(tmp_path):
         assert original_state[k] != new_state[k], f"The new {k} matches"
 
     # Restore from the saved file:
-    trainer._restore(save_dir)
+    trainer._restore(ckpt_fn)
 
     restored_state = {k: f(trainer) for k, f in attributes_to_check.items()}
 
     assert restored_state == original_state, "The restored state differs."
+
+
+def test_save_restore_ray():
+    import ray
+    ray.init()
+    def setup_1d(**kwargs):
+        dist = Normal(np.array([-3]))
+        net = SimpleEnergyModel(1, 2, 2)
+        return dist, net
+
+    trainer = get_energy_trainer(setup_1d)
+    from ray.tune.utils import validate_save_restore
+    validate_save_restore(trainer)
+    validate_save_restore(trainer, use_object_store=True)
