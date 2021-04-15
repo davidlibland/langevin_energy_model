@@ -8,10 +8,7 @@ from sklearn.mixture import GaussianMixture
 from toolz import curry
 
 if TYPE_CHECKING:
-    from src.distributions.core import Distribution
-
-
-plt.switch_backend("agg")
+    from energy_model.distributions.core import Distribution
 
 
 def train_gmm_pca_model(
@@ -28,7 +25,7 @@ def train_gmm_pca_model(
     Returns:
         Distribution modeling the leading PCA components of X.
     """
-    from src.distributions.core import Normal, ApplyTransform
+    from energy_model.distributions.core import Normal, ApplyTransform
 
     dec = PCA(n_components=n_pca_comp, whiten=True)
     clf = GaussianMixture(n_components=n_mixtures, covariance_type=covariance_type)

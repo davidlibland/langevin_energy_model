@@ -4,8 +4,12 @@ import numpy as np
 import torch
 from sklearn.datasets import load_digits
 
-from src.distributions.core import Sampler, Distribution
-from src.distributions.utils import train_gmm_pca_model, plot_image_samples, get_samples
+from energy_model.distributions.core import Sampler, Distribution
+from energy_model.distributions.utils import (
+    train_gmm_pca_model,
+    plot_image_samples,
+    get_samples,
+)
 
 
 @lru_cache()

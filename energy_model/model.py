@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.mcmc.abstract import MCSampler
-from src.utils.resnet import BasicBlock as BasicResnetBlock
-from src.utils.math import swish
+from energy_model.mcmc.abstract import MCSampler
+from energy_model.utils.resnet import BasicBlock as BasicResnetBlock
+from energy_model.utils.math import swish
 
 LANG_INIT_NS = 1
 

@@ -5,10 +5,10 @@ from typing import Tuple
 import numpy as np
 import torch
 
-import src.utils.beta_schedules
-from src.mcmc.mala import MALASampler
-from src.model import BaseEnergyModel
-from src.training_loop import CheckpointCallback
+import energy_model.utils.beta_schedules
+from energy_model.mcmc.mala import MALASampler
+from energy_model.model import BaseEnergyModel
+from energy_model.training_loop import CheckpointCallback
 
 
 @dataclass
@@ -54,7 +54,7 @@ class AISLoss(CheckpointCallback):
     def update_beta_schedule(self):
         num_arith = self.num_interpolants // 5 + 1
         num_geom = self.num_interpolants - num_arith
-        self.beta_schedule = src.utils.beta_schedules.build_schedule(
+        self.beta_schedule = energy_model.utils.beta_schedules.build_schedule(
             ("arith", 0.01, num_arith), ("geom", 1.0, num_geom)
         )
 

@@ -1,3 +1,4 @@
+import collections
 import os
 import random
 import time
@@ -13,18 +14,15 @@ import torch.utils.data as data
 from ray.tune import Trainable
 from torch import optim
 
-import src.mcmc.langevin
-import src.mcmc.mala
-import src.mcmc.tempered_transitions
-import src.utils.ais
-import src.utils.beta_schedules
-import src.utils.constraints
-from src import model
-from src.distributions import core
-from src.utils.ais import AISLoss
-
-
-plt.switch_backend("agg")
+import energy_model.mcmc.langevin
+import energy_model.mcmc.mala
+import energy_model.mcmc.tempered_transitions
+import energy_model.utils.ais
+import energy_model.utils.beta_schedules
+import energy_model.utils.constraints
+from energy_model import model
+from energy_model.distributions import core
+from energy_model.utils.ais import AISLoss
 
 
 MAX_REPLAY = 0
@@ -38,6 +36,7 @@ class Logger:
 
     def __init__(self):
         self.logs = dict()
+        self.full_logs = collections.defaultdict(list)
 
     def __call__(self, **kwargs: float):
         """Logs the metrics passed by keyword, these are stored until flush is called"""
@@ -48,6 +47,8 @@ class Logger:
 
     def flush(self):
         """Clears the store of logs"""
+        for k, l in self.logs.items():
+            self.full_logs[k].extend(l)
         self.logs = dict()
 
     def means(self) -> dict:
@@ -81,26 +82,26 @@ def get_energy_trainer(
             self.sample_size = config.get("sample_size", 30000)
             sampler_lr = config.get("sampler_lr", 0.1)
             beta_target = config.get("sampler_beta_target", 1.0)
-            sampler_beta_schedule = src.utils.beta_schedules.build_schedule(
+            sampler_beta_schedule = energy_model.utils.beta_schedules.build_schedule(
                 ("geom", beta_target, sampler_beta_schedule_num_steps,),
                 start=config.get("sampler_beta_min", 0.1),
             )
             samplers = {
-                "mala": src.mcmc.mala.MALASampler(
+                "mala": energy_model.mcmc.mala.MALASampler(
                     lr=sampler_lr, beta=beta_target, logger=self.logger_
                 ),
-                "langevin": src.mcmc.langevin.LangevinSampler(
+                "langevin": energy_model.mcmc.langevin.LangevinSampler(
                     lr=sampler_lr, beta=beta_target, logger=self.logger_,
                 ),
-                "tempered langevin": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.langevin.LangevinSampler(
+                "tempered langevin": energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(
                         lr=sampler_lr, logger=self.logger_
                     ),
                     beta_schedule=sampler_beta_schedule,
                     logger=self.logger_,
                 ),
-                "tempered mala": src.mcmc.tempered_transitions.TemperedTransitions(
-                    mc_dynamics=src.mcmc.mala.MALASampler(
+                "tempered mala": energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=energy_model.mcmc.mala.MALASampler(
                         lr=sampler_lr, logger=self.logger_
                     ),
                     beta_schedule=sampler_beta_schedule,
@@ -341,7 +342,7 @@ def get_energy_trainer(
                 for k, v in means.items():
                     print(f"{k}: {v}")
             self.logger_.flush()
-            means["loss"] = src.utils.constraints.add_soft_constraint(
+            means["loss"] = energy_model.utils.constraints.add_soft_constraint(
                 means["loss_ais"], means["data_erf"], lower_bound=-1
             )
             return means

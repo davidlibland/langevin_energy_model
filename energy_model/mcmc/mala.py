@@ -4,11 +4,11 @@ from typing import Callable
 import torch
 from toolz import curry
 
-import src.utils.math
-from src.mcmc.abstract import MCSampler
+import energy_model.utils.math
+from energy_model.mcmc.abstract import MCSampler
 
 if TYPE_CHECKING:
-    from src.model import BaseEnergyModel
+    from energy_model.model import BaseEnergyModel
 
 UPPER_ACCEPTANCE_BOUND = 0.7
 LOWER_ACCEPTANCE_BOUND = 0.4
@@ -37,7 +37,7 @@ class MALASampler(MCSampler):
         y.sum().backward()
         grad_x = x.grad
 
-        avg_energy_grad = float(src.utils.math.avg_norm(grad_x))
+        avg_energy_grad = float(energy_model.utils.math.avg_norm(grad_x))
         self.logger(avg_energy_grad=avg_energy_grad)
 
         # Hack to keep gradients in control:
@@ -81,7 +81,7 @@ class MALASampler(MCSampler):
             # Add extra feature-dims
             mask.unsqueeze_(dim=-1)
         result = torch.where(mask, x_, x).detach()
-        avg_distance = src.utils.math.avg_norm(result - x)
+        avg_distance = energy_model.utils.math.avg_norm(result - x)
         self.logger(avg_sample_distance=float(avg_distance))
         return result
 

@@ -6,9 +6,9 @@ import os
 import numpy as np
 import torch
 
-from src.distributions.core import Normal
-from src.hparam_sweep import get_energy_trainer
-from src.model import SimpleEnergyModel
+from energy_model.distributions.core import Normal
+from energy_model.hparam_sweep import get_energy_trainer
+from energy_model.model import SimpleEnergyModel
 
 
 class NumpyEncoder(json.JSONEncoder):

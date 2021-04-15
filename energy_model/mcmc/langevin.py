@@ -3,11 +3,11 @@ from typing import Callable
 
 import torch
 
-import src.utils.math
-from src.mcmc.abstract import MCSampler
+import energy_model.utils.math
+from energy_model.mcmc.abstract import MCSampler
 
 if TYPE_CHECKING:
-    from src.model import BaseEnergyModel
+    from energy_model.model import BaseEnergyModel
 
 
 class LangevinSampler(MCSampler):
@@ -44,7 +44,7 @@ class LangevinSampler(MCSampler):
         result = x - lr * grad_x + noise_scale * torch.randn_like(x)
 
         self.logger(energy_grad_to_noise=avg_energy_grad * lr / float(noise_scale))
-        avg_distance = src.utils.math.avg_norm(result - x)
+        avg_distance = energy_model.utils.math.avg_norm(result - x)
         self.logger(avg_sample_distance=float(avg_distance))
         return result.detach()
 

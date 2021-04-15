@@ -3,22 +3,22 @@ from typing import Callable
 
 import torch
 
-import src.mcmc.abstract
-import src.utils.beta_schedules
+import energy_model.mcmc.abstract
+import energy_model.utils.beta_schedules
 
 if TYPE_CHECKING:
-    from src.model import BaseEnergyModel
+    from energy_model.model import BaseEnergyModel
 
 
-class TemperedTransitions(src.mcmc.abstract.MCSampler):
+class TemperedTransitions(energy_model.mcmc.abstract.MCSampler):
     def __init__(
         self,
-        mc_dynamics: src.mcmc.abstract.MCSampler,
+        mc_dynamics: energy_model.mcmc.abstract.MCSampler,
         beta_schedule=None,
         logger: Callable = None,
     ):
         if beta_schedule is None:
-            beta_schedule = src.utils.beta_schedules.build_schedule(
+            beta_schedule = energy_model.utils.beta_schedules.build_schedule(
                 ("geom", 1.0, 30), start=0.1,
             )
         self.beta_schedule = beta_schedule
@@ -73,7 +73,7 @@ class TemperedTransitions(src.mcmc.abstract.MCSampler):
         acceptance_ratio = torch.mean(mask.float()).float()
         self.logger(tempered_acceptance_ratio=float(acceptance_ratio))
         result = torch.where(mask, current_samples, x).detach()
-        avg_distance = src.utils.math.avg_norm(result - x)
+        avg_distance = energy_model.utils.math.avg_norm(result - x)
         self.logger(tempered_avg_sample_distance=float(avg_distance))
         return result
 

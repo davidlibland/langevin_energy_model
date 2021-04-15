@@ -1,4 +1,4 @@
-from src.utils.constraints import add_soft_constraint
+from energy_model.utils.constraints import add_soft_constraint
 
 
 def test_add_soft_constraint():

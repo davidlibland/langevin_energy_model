@@ -7,7 +7,7 @@ import torch
 import torch.optim as optim
 import torch.utils.data as data
 
-from src.model import BaseEnergyModel
+from energy_model.model import BaseEnergyModel
 
 # Globals
 

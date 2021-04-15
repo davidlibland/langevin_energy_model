@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from src.utils.math import identity
+from energy_model.utils.math import identity
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):

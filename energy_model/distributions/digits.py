@@ -1,32 +1,37 @@
 from functools import lru_cache
 
 import numpy as np
-from sklearn.datasets import fetch_openml
+from sklearn.datasets import load_digits
 
-from src.distributions.core import Distribution, Sampler
-from src.distributions.utils import plot_image_samples, get_samples, train_gmm_pca_model
+from energy_model.distributions.utils import (
+    train_gmm_pca_model,
+    plot_image_samples,
+    get_samples,
+)
+from .core import Distribution, Sampler
 
 
 @lru_cache()
-def get_mnist_distribution() -> Sampler:
+def get_digit_distribution() -> Sampler:
     """
-    Returns a MNIST sampler.
+    Returns a Digits Sampler.
 
     Returns:
-        Sampler: Sampling mnist digits
+        Sampler: Sampling digits
     """
-    X, y = fetch_openml("mnist_784", version=1, return_X_y=True)
+    X, y = load_digits(return_X_y=True)
     X = 2 * X.astype(np.float) / X.max() - 1
-    X = X.reshape([-1, 1, 28, 28])
-    mnist_dist = Sampler.from_samples(
+    n = X.shape[0]
+    X = X.reshape([n, 1, 8, 8])
+    digit_dist = Sampler.from_samples(
         X, noise=lambda shape: 2 * np.random.rand(*shape) / 255
     )
-    mnist_dist.visualize = plot_image_samples([28, 28], False)
-    return mnist_dist
+    digit_dist.visualize = plot_image_samples([8, 8], False)
+    return digit_dist
 
 
 @lru_cache()
-def get_approx_mnist_distribution(
+def get_approx_digit_distribution(
     n_pca_comp=10, n_mixtures=5, covariance_type="spherical"
 ) -> Distribution:
     """
@@ -39,7 +44,7 @@ def get_approx_mnist_distribution(
     Returns:
         Distribution: An approximate model of mnist.
     """
-    X, y = fetch_openml("mnist_784", version=1, return_X_y=True)
+    X, y = load_digits(return_X_y=True)
     X = X.astype(np.float) / X.max()
     y = np.array([int(v) for v in y])
     distributions = []
@@ -54,6 +59,6 @@ def get_approx_mnist_distribution(
         )
         distributions.append(dist)
     mnist_dist = Distribution.mixture(distributions)
-    mnist_dist.visualize = plot_image_samples([28, 28], False)
+    mnist_dist.visualize = plot_image_samples([8, 8], False)
     mnist_dist.rvs = get_samples(X)
     return mnist_dist

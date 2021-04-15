@@ -4,7 +4,7 @@ import torch
 from toolz import curry
 
 if TYPE_CHECKING:
-    from src.model import BaseEnergyModel
+    from energy_model.model import BaseEnergyModel
 
 
 class MCSampler:
