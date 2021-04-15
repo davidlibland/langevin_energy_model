@@ -13,6 +13,8 @@ import numpy as np
 import torch
 from torch import optim
 import torch.utils.data as data
+import sklearn.ensemble as sk_ensemble
+
 import energy_model.model
 import energy_model.utils
 import energy_model.utils.beta_schedules
@@ -33,11 +35,9 @@ def e_coef(data_samples, model_samples):
 
 class EnergyModel:
     def __init__(self, num_inputs, **kwargs):
-        self.set_params(num_inputs=num_inputs, **kwargs)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.net_.to(self.device)
+        self.set_params(num_inputs=num_inputs, **kwargs)
         self.verbose = True
-        self.model_samples_ = None
 
     def fit(self, X, y=None):
         """
@@ -50,9 +50,6 @@ class EnergyModel:
 
         epoch_training_time = 0
         epoch_metrics_time = 0
-        optimizer = optim.Adam(
-            self.net_.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
 
         dataloader = data.DataLoader(
             dataset=np.array(X, dtype=np.float32),
@@ -60,22 +57,15 @@ class EnergyModel:
             drop_last=False,
             shuffle=True,
         )
+        adversary = None
 
-        for epoch in range(self.max_iter):
+        for epoch in range(self.epoch, self.max_iter):
             for i_batch, sample_batched in enumerate(dataloader):
                 batch_start_time = time.time()
                 data_sample = sample_batched.to(self.device)
 
                 # Get model samples, either from replay buffer or noise.
-                if self.model_samples_ is None:
-                    self.model_samples_ = deque(
-                        [
-                            self.net_.sample_from_prior(
-                                data_sample.shape[0], device=self.device
-                            ).detach()
-                        ]
-                    )
-                elif len(self.model_samples_) > self.max_replay:
+                if len(self.model_samples_) > self.max_replay:
                     self.model_samples_.popleft()
                 replay_sample = random.choices(
                     self.model_samples_,
@@ -127,9 +117,45 @@ class EnergyModel:
                 )
 
                 objective = data_energy_mean - model_energy_mean
+
+                # Potentially add the adversary:
+                if adversary:
+                    y = adversary.predict_proba(
+                        model_sample.detach().cpu().numpy()
+                    ).astype(np.float32)
+                    weight = (y @ adversary.classes_).reshape([-1, 1])
+                    self.logger_(adversary_cost=weight.mean())
+                    adversary_energy = -(model_energy * torch.tensor(weight)).mean()
+                    objective = (
+                        self.adversary_weight * adversary_energy
+                        + (1 - self.adversary_weight) * objective
+                    )
+                else:
+                    self.logger_(adversary_cost=1.0)
+
                 objective.backward()
                 torch.nn.utils.clip_grad.clip_grad_value_(self.net_.parameters(), 1e2)
-                optimizer.step()
+                self.optimizer.step()
+
+                if self.adversary_weight:
+                    adversary = sk_ensemble.RandomForestClassifier()
+                    X = np.concatenate(
+                        [data_sample.detach().cpu().numpy()]
+                        + [
+                            m_sample.detach().cpu().numpy()
+                            for m_sample in self.model_samples_
+                        ],
+                        axis=0,
+                    )
+                    y = np.concatenate(
+                        [np.zeros(shape=data_sample.shape[:1])]
+                        + [
+                            np.ones(shape=m_sample.shape[:1])
+                            for m_sample in self.model_samples_
+                        ],
+                        axis=0,
+                    )
+                    adversary.fit(X, y)
 
                 batch_training_time = time.time() - batch_start_time
                 epoch_training_time += batch_training_time
@@ -154,6 +180,7 @@ class EnergyModel:
                 for k, v in means.items():
                     print(f"{k}: {v}")
             self.logger_.flush()
+            self.epoch = epoch
 
     def sample(self, n_samples):
         """Return samples"""
@@ -201,12 +228,7 @@ class EnergyModel:
             self.kwargs = {}
         self.kwargs = {**self.kwargs, **kwargs}
         kwargs = self.kwargs
-        self.net_ = energy_model.model.SimpleEnergyModel(
-            kwargs.get("num_inputs"),
-            kwargs.get("num_layers", 3),
-            kwargs.get("num_units", 16),
-            kwargs.get("prior_scale", 1),
-        )
+        self.adversary_weight = kwargs.get("adversary_weight")
         self.batch_size = kwargs.get("batch_size", 1024)
         self.weight_decay = kwargs.get("weight_decay", 1e-3)
         self.lr = kwargs.get("lr", 1e-2)
@@ -225,7 +247,6 @@ class EnergyModel:
         self.sampler_lr = kwargs.get("sampler_lr", 10 * self.lr)
         self.beta_target = kwargs.get("sampler_beta_target", 1)
         self.sampler_beta_min = kwargs.get("sampler_beta_min", 0.1)
-        self.logger_ = Logger()
         # Reweight number of steps if tempering is used:
         sampler_beta_schedule_num_steps = max(
             self.num_mc_steps // self.num_tempered_transitions, 1
@@ -234,27 +255,47 @@ class EnergyModel:
             ("geom", self.beta_target, sampler_beta_schedule_num_steps,),
             start=self.sampler_beta_min,
         )
-        samplers = {
-            "mala": energy_model.mcmc.mala.MALASampler(
-                lr=self.sampler_lr, beta=self.beta_target, logger=self.logger_
-            ),
-            "langevin": energy_model.mcmc.langevin.LangevinSampler(
-                lr=self.sampler_lr, beta=self.beta_target, logger=self.logger_,
-            ),
-            "tempered langevin": energy_model.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(
-                    lr=self.sampler_lr, logger=self.logger_
+        if not kwargs.get("warm_start") or not hasattr(self, "net_"):
+            self.net_ = energy_model.model.SimpleEnergyModel(
+                kwargs.get("num_inputs"),
+                kwargs.get("num_layers", 3),
+                kwargs.get("num_units", 16),
+                kwargs.get("prior_scale", 1),
+            )
+            self.net_.to(self.device)
+            self.optimizer = optim.Adam(
+                self.net_.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            )
+            self.logger_ = Logger()
+            samplers = {
+                "mala": energy_model.mcmc.mala.MALASampler(
+                    lr=self.sampler_lr, beta=self.beta_target, logger=self.logger_
                 ),
-                beta_schedule=sampler_beta_schedule,
-                logger=self.logger_,
-            ),
-            "tempered mala": energy_model.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=energy_model.mcmc.mala.MALASampler(
-                    lr=self.sampler_lr, logger=self.logger_
+                "langevin": energy_model.mcmc.langevin.LangevinSampler(
+                    lr=self.sampler_lr, beta=self.beta_target, logger=self.logger_,
                 ),
-                beta_schedule=sampler_beta_schedule,
-                logger=self.logger_,
-            ),
-        }
-        self.sampler_ = samplers.get(sampler)
+                "tempered langevin": energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(
+                        lr=self.sampler_lr, logger=self.logger_
+                    ),
+                    beta_schedule=sampler_beta_schedule,
+                    logger=self.logger_,
+                ),
+                "tempered mala": energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                    mc_dynamics=energy_model.mcmc.mala.MALASampler(
+                        lr=self.sampler_lr, logger=self.logger_
+                    ),
+                    beta_schedule=sampler_beta_schedule,
+                    logger=self.logger_,
+                ),
+            }
+            self.model_samples_ = deque(
+                [
+                    self.net_.sample_from_prior(
+                        self.batch_size, device=self.device
+                    ).detach()
+                ]
+            )
+            self.sampler_ = samplers.get(sampler)
+            self.epoch = 0
         return self
