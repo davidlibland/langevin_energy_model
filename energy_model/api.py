@@ -23,6 +23,7 @@ import energy_model.mcmc.langevin
 import energy_model.mcmc.tempered_transitions
 import energy_model.mcmc.mala
 from energy_model.hparam_sweep import Logger
+from energy_model.utils.ais import AISLoss
 
 
 def e_coef(data_samples, model_samples):
@@ -105,7 +106,8 @@ class EnergyModel:
                 # Forward gradient:
                 self.net_.train()
                 self.net_.zero_grad()
-                data_energy_mean = self.net_(data_sample).mean()
+                data_energy = self.net_(data_sample)
+                data_energy_mean = data_energy.mean()
                 model_energy = self.net_(model_sample)
                 model_energy_mean = model_energy.mean()
                 self.logger_(energy_coef=e_coef(data_sample, model_sample))
@@ -116,7 +118,7 @@ class EnergyModel:
                     (data_energy_mean - model_energy_mean) / model_energy.std()
                 )
 
-                objective = data_energy_mean - model_energy_mean
+                objective = data_energy.sum() - model_energy.sum()
 
                 # Potentially add the adversary:
                 if adversary:
@@ -125,7 +127,7 @@ class EnergyModel:
                     ).astype(np.float32)
                     weight = (y @ adversary.classes_).reshape([-1, 1])
                     self.logger_(adversary_cost=weight.mean())
-                    adversary_energy = -(model_energy * torch.tensor(weight)).mean()
+                    adversary_energy = -(model_energy * torch.tensor(weight)).sum()
                     objective = (
                         self.adversary_weight * adversary_energy
                         + (1 - self.adversary_weight) * objective
@@ -138,7 +140,7 @@ class EnergyModel:
                 self.optimizer.step()
 
                 if self.adversary_weight:
-                    adversary = sk_ensemble.RandomForestClassifier()
+                    adversary = sk_ensemble.RandomForestClassifier(class_weight="balanced")
                     X = np.concatenate(
                         [data_sample.detach().cpu().numpy()]
                         + [
@@ -148,7 +150,7 @@ class EnergyModel:
                         axis=0,
                     )
                     y = np.concatenate(
-                        [np.zeros(shape=data_sample.shape[:1])]
+                        [-np.ones(shape=data_sample.shape[:1])]
                         + [
                             np.ones(shape=m_sample.shape[:1])
                             for m_sample in self.model_samples_
@@ -163,6 +165,8 @@ class EnergyModel:
                 self.logger_(data_erf=float(data_erf))
 
                 tr_metrics_start_time = time.time()
+                if self.use_ais and i_batch == 0 and epoch % 10 == 0:
+                    self.ais_loss(net=self.net_, data_sample=data_sample, global_step=epoch)
                 tr_metrics_time = time.time() - tr_metrics_start_time
                 epoch_metrics_time += tr_metrics_time
                 if self.verbose:
@@ -206,6 +210,11 @@ class EnergyModel:
         """Returns the (negative) energy coefficient"""
         del y  # unused
         n_samples = X.shape[0]
+
+        if self.use_ais:
+            data_sample = torch.tensor(np.array(X).astype(np.float32))
+            return -self.ais_loss(net=self.net_, data_sample=data_sample, global_step=self.epoch)
+        # Otherwise, use the energy coefficient
         model_samples = self.sample(n_samples)
         return -np.log(e_coef(X, model_samples))
 
@@ -228,6 +237,7 @@ class EnergyModel:
             self.kwargs = {}
         self.kwargs = {**self.kwargs, **kwargs}
         kwargs = self.kwargs
+        self.use_ais = kwargs.get("use_ais", False)
         self.adversary_weight = kwargs.get("adversary_weight")
         self.batch_size = kwargs.get("batch_size", 1024)
         self.weight_decay = kwargs.get("weight_decay", 1e-3)
@@ -242,10 +252,10 @@ class EnergyModel:
             self.num_mc_steps = num_tempered_transitions
         self.num_tempered_transitions = num_tempered_transitions
         self.num_sample_mc_steps = kwargs.get("num_sample_mc_steps", 100)
-        self.sample_beta = kwargs.get("sample_beta", 1)
         self.sample_size = kwargs.get("sample_size", 1000)
         self.sampler_lr = kwargs.get("sampler_lr", 10 * self.lr)
         self.beta_target = kwargs.get("sampler_beta_target", 1)
+        self.sample_beta = kwargs.get("sample_beta", self.beta_target)
         self.sampler_beta_min = kwargs.get("sampler_beta_min", 0.1)
         # Reweight number of steps if tempering is used:
         sampler_beta_schedule_num_steps = max(
@@ -298,4 +308,12 @@ class EnergyModel:
             )
             self.sampler_ = samplers.get(sampler)
             self.epoch = 0
+
+            self.ais_loss = AISLoss(
+                logger=self.logger_,
+                num_chains=kwargs.get("ais_num_chains", 100),
+                log_z_update_interval=kwargs.get("ais_update_interval", 32),
+                max_interpolants=kwargs.get("ais_max_interpolants", 5000),
+                num_interpolants=kwargs.get("ais_num_interpolants", 500),
+            )
         return self

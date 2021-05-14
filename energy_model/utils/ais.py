@@ -27,10 +27,11 @@ class AISLoss(CheckpointCallback):
         log_z_update_interval=5,
         device=None,
         mc_dynamics=None,
-        lower_threshold=0.1,
+        lower_threshold=0.01,
         num_interpolants=1000,
         max_interpolants=5000,
     ):
+        self.min_interpolants = num_interpolants
         self.num_interpolants = num_interpolants
         self.max_interpolants = max_interpolants
         self.update_beta_schedule()
@@ -52,8 +53,8 @@ class AISLoss(CheckpointCallback):
         self.lower_threshold = lower_threshold
 
     def update_beta_schedule(self):
-        num_arith = self.num_interpolants // 5 + 1
-        num_geom = self.num_interpolants - num_arith
+        num_arith = int(self.num_interpolants // 5 + 1)
+        num_geom = int(self.num_interpolants - num_arith)
         self.beta_schedule = energy_model.utils.beta_schedules.build_schedule(
             ("arith", 0.01, num_arith), ("geom", 1.0, num_geom)
         )
@@ -114,7 +115,20 @@ class AISLoss(CheckpointCallback):
         ):
             # Increase the number of interpolants:
             self.num_interpolants *= log_w_var
+            self.num_interpolants = int(self.num_interpolants)
             self.num_interpolants = min(self.max_interpolants, self.num_interpolants)
+            self.update_beta_schedule()
+        # Decrease the number of interpolants if the accuracy is too high.
+        elif (
+            self.lower_threshold
+            and effective_sample_size > self.lower_threshold * self.num_chains * 3
+        ):
+            # Decrease the number of interpolants:
+            self.num_interpolants *= 0.9
+            self.num_interpolants = int(self.num_interpolants)
+            self.num_interpolants = max(self.min_interpolants, self.num_interpolants)
+            self.update_beta_schedule()
+        return loss
 
     @staticmethod
     def get_diagnostic_stats(log_w) -> Tuple[float, float]:
