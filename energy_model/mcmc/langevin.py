@@ -28,10 +28,10 @@ class LangevinSampler(MCSampler):
         if beta is None:
             beta = self.beta
         x.requires_grad_(True)
+        x.retain_grad()
         if x.grad is not None:
             x.grad.data.zero_()
         y = net(x, beta=beta).sum() / (beta + 1)
-        x.retain_grad()
         y.backward()
         grad_x = x.grad
         avg_energy_grad = float(grad_x.norm() / grad_x.shape[0])
