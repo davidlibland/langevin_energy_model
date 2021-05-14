@@ -6,13 +6,11 @@ import numpy as np
 import pytest
 import torch
 
-import src.mcmc.langevin
-import src.mcmc.mala
-import src.mcmc.tempered_transitions
-from src import model
+import energy_model.mcmc.langevin
+import energy_model.mcmc.mala
+import energy_model.mcmc.tempered_transitions
+from energy_model import model
 
-
-plt.switch_backend("agg")
 
 
 class NormalNet(model.BaseEnergyModel):
@@ -50,19 +48,19 @@ class MixtureNormalNet(model.BaseEnergyModel):
 @pytest.mark.parametrize(
     "name, fsampler, num_steps",
     [
-        ("langevin", lambda: src.mcmc.langevin.LangevinSampler(lr=0.1), 100),
-        ("mala", lambda: src.mcmc.mala.MALASampler(lr=0.1), 100),
+        ("langevin", lambda: energy_model.mcmc.langevin.LangevinSampler(lr=0.1), 100),
+        ("mala", lambda: energy_model.mcmc.mala.MALASampler(lr=0.1), 100),
         (
             "tempered langevin",
-            lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=src.mcmc.langevin.LangevinSampler(lr=0.5)
+            lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(lr=0.5)
             ),
             10,
         ),
         (
             "tempered mala",
-            lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=src.mcmc.mala.MALASampler(lr=0.5)
+            lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                mc_dynamics=energy_model.mcmc.mala.MALASampler(lr=0.5)
             ),
             10,
         ),
@@ -92,13 +90,13 @@ def test_normal_stats(
 
 
 test_samplers = {
-    "langevin": lambda: src.mcmc.langevin.LangevinSampler(lr=0.5),
-    "mala": lambda: src.mcmc.mala.MALASampler(lr=0.5),
-    "tempered langevin": lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-        mc_dynamics=src.mcmc.langevin.LangevinSampler(lr=0.5)
+    "langevin": lambda: energy_model.mcmc.langevin.LangevinSampler(lr=0.5),
+    "mala": lambda: energy_model.mcmc.mala.MALASampler(lr=0.5),
+    "tempered langevin": lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+        mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(lr=0.5)
     ),
-    "tempered mala": lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-        mc_dynamics=src.mcmc.mala.MALASampler(lr=0.5)
+    "tempered mala": lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+        mc_dynamics=energy_model.mcmc.mala.MALASampler(lr=0.5)
     ),
 }
 

@@ -1,17 +1,17 @@
 import pytest
 
-import src.model
-import src.mcmc.langevin
-import src.mcmc.mala
-import src.mcmc.tempered_transitions
+import energy_model.model
+import energy_model.mcmc.langevin
+import energy_model.mcmc.mala
+import energy_model.mcmc.tempered_transitions
 
 
 @pytest.mark.parametrize(
     "model_factory,model_args",
     [
-        (src.model.SimpleEnergyModel, (3, 2, 2)),
-        (src.model.ConvEnergyModel, ((2, 4, 4), 2, 4)),
-        (src.model.ResnetEnergyModel, ((2, 4, 4), 2, 2, 4)),
+        (energy_model.model.SimpleEnergyModel, (3, 2, 2)),
+        (energy_model.model.ConvEnergyModel, ((2, 4, 4), 2, 4)),
+        (energy_model.model.ResnetEnergyModel, ((2, 4, 4), 2, 2, 4)),
     ],
 )
 def test_model_outputs(model_factory, model_args):
@@ -27,27 +27,27 @@ def test_model_outputs(model_factory, model_args):
 @pytest.mark.parametrize(
     "model_factory,model_args",
     [
-        (src.model.SimpleEnergyModel, (3, 2, 2)),
-        (src.model.ConvEnergyModel, ((2, 4, 4), 2, 4)),
-        (src.model.ResnetEnergyModel, ((2, 4, 4), 2, 2, 4)),
+        (energy_model.model.SimpleEnergyModel, (3, 2, 2)),
+        (energy_model.model.ConvEnergyModel, ((2, 4, 4), 2, 4)),
+        (energy_model.model.ResnetEnergyModel, ((2, 4, 4), 2, 2, 4)),
     ],
 )
 @pytest.mark.parametrize(
     "name, fsampler, num_steps",
     [
-        ("langevin", lambda: src.mcmc.langevin.LangevinSampler(lr=0.1), 100),
-        ("mala", lambda: src.mcmc.mala.MALASampler(lr=0.1), 100),
+        ("langevin", lambda: energy_model.mcmc.langevin.LangevinSampler(lr=0.1), 100),
+        ("mala", lambda: energy_model.mcmc.mala.MALASampler(lr=0.1), 100),
         (
             "tempered langevin",
-            lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=src.mcmc.langevin.LangevinSampler(lr=0.5)
+            lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                mc_dynamics=energy_model.mcmc.langevin.LangevinSampler(lr=0.5)
             ),
             10,
         ),
         (
             "tempered mala",
-            lambda: src.mcmc.tempered_transitions.TemperedTransitions(
-                mc_dynamics=src.mcmc.mala.MALASampler(lr=0.5)
+            lambda: energy_model.mcmc.tempered_transitions.TemperedTransitions(
+                mc_dynamics=energy_model.mcmc.mala.MALASampler(lr=0.5)
             ),
             10,
         ),

@@ -3,12 +3,12 @@ import scipy.special as scisp
 import torch
 import torch.nn as nn
 
-import src.utils.beta_schedules
-from src.mcmc.langevin import LangevinSampler
-from src.mcmc.mala import MALASampler
-from src.model import BaseEnergyModel
-from src.model import LANG_INIT_NS
-from src.utils.ais import AISLoss
+import energy_model.utils.beta_schedules
+from energy_model.mcmc.langevin import LangevinSampler
+from energy_model.mcmc.mala import MALASampler
+from energy_model.model import BaseEnergyModel
+from energy_model.model import LANG_INIT_NS
+from energy_model.utils.ais import AISLoss
 
 
 class DiagonalNormalModel(BaseEnergyModel):
